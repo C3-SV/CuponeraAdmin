@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { randomUUID } from "node:crypto";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
 import type {
   CompanyActionResult,
   CompanyCategoryOption,
@@ -37,6 +37,8 @@ type CompanyRow = {
       }[]
     | null;
 };
+
+type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
 
 const DEFAULT_QUERY: CompanyQueryParams = {
   search: "",
@@ -92,7 +94,7 @@ function getCategoryImagePath(row: CompanyRow): string | null {
 
 // Construye la URL pública de icono de categoría si en BD solo hay path.
 function buildCategoryIconUrl(
-  supabase: ReturnType<typeof createSupabaseServerClient>,
+  supabase: SupabaseServerClient,
   categoryImg: string | null,
 ): string | null {
   if (!categoryImg) {
@@ -109,7 +111,7 @@ function buildCategoryIconUrl(
 
 // Construye la URL pública del logo de empresa cuando en BD hay path relativo.
 function buildCompanyPhotoUrl(
-  supabase: ReturnType<typeof createSupabaseServerClient>,
+  supabase: SupabaseServerClient,
   companyPhoto: string | null,
 ): string | null {
   if (!companyPhoto) {
@@ -133,7 +135,7 @@ function buildCompanyPhotoUrl(
 // Mapea el registro raw de Supabase al modelo que consume la UI.
 function toCompanyListItem(
   row: CompanyRow,
-  supabase: ReturnType<typeof createSupabaseServerClient>,
+  supabase: SupabaseServerClient,
 ): CompanyListItem {
   const category_img = getCategoryImagePath(row);
 
@@ -179,7 +181,7 @@ async function uploadCompanyPhoto(
   payload: CompanyImagePayload,
   companyId: string,
 ): Promise<{ ok: true; publicUrl: string } | { ok: false; message: string }> {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createClient();
 
   try {
     const { bytes, contentType } = parseDataUrl(payload);
@@ -222,7 +224,7 @@ async function findCompanyByCode(
   code: string,
   exceptCompanyId?: string,
 ): Promise<boolean> {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createClient();
 
   let query = supabase
     .from("companies")
@@ -246,7 +248,7 @@ async function findCompanyByCode(
 // Lista categorías activas para filtros y selects en formularios.
 export async function listCategoriesForFilter(): Promise<CompanyCategoryOption[]> {
   try {
-    const supabase = createSupabaseServerClient();
+    const supabase = await createClient();
     const { data, error } = await supabase
       .from("categories")
       .select("category_id, category_name, category_img")
@@ -284,7 +286,7 @@ export async function listCompanies(
   const to = from + pageSize - 1;
 
   try {
-    const supabase = createSupabaseServerClient();
+    const supabase = await createClient();
     let query = supabase
       .from("companies")
       .select(
@@ -387,7 +389,7 @@ export async function getCompanyDetail(
   companyId: string,
 ): Promise<CompanyActionResult<CompanyDetail>> {
   try {
-    const supabase = createSupabaseServerClient();
+    const supabase = await createClient();
     const { data, error } = await supabase
       .from("companies")
       .select(
@@ -444,7 +446,7 @@ export async function createCompany(
       };
     }
 
-    const supabase = createSupabaseServerClient();
+    const supabase = await createClient();
 
     const { data: createdCompany, error: createError } = await supabase
       .from("companies")
@@ -545,7 +547,7 @@ export async function updateCompany(
       };
     }
 
-    const supabase = createSupabaseServerClient();
+    const supabase = await createClient();
     let photoUrl: string | undefined;
 
     if (file) {
@@ -617,7 +619,7 @@ export async function softDeleteCompany(
   companyId: string,
 ): Promise<CompanyActionResult> {
   try {
-    const supabase = createSupabaseServerClient();
+    const supabase = await createClient();
     const { error } = await supabase
       .from("companies")
       .update({
