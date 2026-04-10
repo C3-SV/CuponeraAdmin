@@ -1,29 +1,25 @@
-import { createClient } from "@supabase/supabase-js";
+import { createServerClient } from '@supabase/ssr'
+import { cookies } from 'next/headers'
 
-// MANEJO TEMPORAL DEL CLIENTE DE SUPABASE, EN LO QUE SE IMPLEMENTA AUTENTICACION 
+export async function createClient() {
+  const cookieStore = await cookies()
 
-// Centraliza lectura/validación de variables para cliente Supabase de servidor.
-function getSupabaseConfig() {
-  const url = process.env.VITE_SUPABASE_URL;
-  const key = process.env.VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY;
-
-  if (!url || !key) {
-    throw new Error(
-      "Faltan variables de entorno."
-    );
-  }
-
-  return { url, key };
-}
-
-// Crea cliente Supabase para Server Actions sin persistencia de sesión local.
-export function createSupabaseServerClient() {
-  const { url, key } = getSupabaseConfig();
-
-  return createClient(url, key, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
-  });
+  return createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return cookieStore.getAll()
+        },
+        setAll(cookiesToSet) {
+          try {
+            cookiesToSet.forEach(({ name, value, options }) =>
+              cookieStore.set(name, value, options)
+            )
+          } catch {}
+        },
+      },
+    }
+  )
 }
