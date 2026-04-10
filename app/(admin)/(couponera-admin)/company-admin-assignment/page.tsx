@@ -1,11 +1,17 @@
-import { ModulePlaceholder } from "@/components/dashboard/module-placeholder";
+import { CompanyAdminAssignmentCrud } from "@/components/company-admin-assignment/company-admin-assignment-crud";
+import { listCompanyAdminAssignments } from "./actions";
 
-export default function CompanyAdminAssignmentPage() {
+// Carga inicial server-side para hidratar la tabla con estado consistente.
+export default async function CompanyAdminAssignmentPage() {
+  const initialList = await listCompanyAdminAssignments({
+    search: "",
+    sortBy: "company_name",
+    sortDir: "asc",
+    page: 1,
+    pageSize: 10,
+  });
+
   return (
-    <ModulePlaceholder
-      title="Asignacion de Admin de Empresa"
-      description="Base para vincular perfiles administrativos de empresa desde la tabla profiles."
-      ownerHint="Responsable: Persona 3"
-    />
+    <CompanyAdminAssignmentCrud initialList={initialList} />
   );
 }
