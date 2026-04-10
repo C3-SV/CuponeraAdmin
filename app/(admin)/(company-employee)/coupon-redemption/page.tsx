@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { createClient } from "@/lib/supabase/client";
 
 type InputMethod = "link" | "code" | "qr";
 
@@ -9,44 +10,47 @@ type Coupon = {
   offerTitle: string;
   customerName: string;
   code: string;
-  qrToken: string;
-  linkToken: string;
   expiresAt: string;
   redeemedAt: string | null;
+  redeemedBy: string | null;
+  status: string;
 };
 
-const initialCoupons: Coupon[] = [
-  {
-    id: "CP-1001",
-    offerTitle: "2x1 Hamburguesa Clasica",
-    customerName: "Andrea Perez",
-    code: "HAM2X1",
-    qrToken: "QR-AX19-KP02",
-    linkToken: "lnk-ham2x1-1001",
-    expiresAt: "2026-12-31T23:59:59.000Z",
-    redeemedAt: null,
-  },
-  {
-    id: "CP-1002",
-    offerTitle: "40% en Spa Relax",
-    customerName: "Carlos Rodriguez",
-    code: "SPA40",
-    qrToken: "QR-SP40-TR71",
-    linkToken: "lnk-spa40-1002",
-    expiresAt: "2025-01-10T23:59:59.000Z",
-    redeemedAt: null,
-  },
-  {
-    id: "CP-1003",
-    offerTitle: "Entrada Cine + Combo",
-    customerName: "Daniela Molina",
-    code: "CINEPLUS",
-    qrToken: "QR-CN88-ZQ10",
-    linkToken: "lnk-cineplus-1003",
-    expiresAt: "2026-11-20T23:59:59.000Z",
-    redeemedAt: "2026-04-01T17:45:00.000Z",
-  },
-];
+type ProfileRow = {
+  user_id: string;
+  first_names: string | null;
+  last_names: string | null;
+};
+
+type OrderRow = {
+  order_id: string;
+  customer_id: string;
+  order_status: string;
+  deleted_at: string | null;
+};
+
+type OrderItemRow = {
+  order_item_id: string;
+  order_id: string;
+  offer_id: string;
+  deleted_at: string | null;
+};
+
+type OfferRow = {
+  offer_id: string;
+  offer_title: string;
+};
+
+type CouponRow = {
+  coupon_id: string;
+  order_item_id: string;
+  coupon_code: string;
+  coupon_expires_at: string;
+  coupon_redeemed_at: string | null;
+  coupon_redeemed_by: string | null;
+  coupon_status: string;
+  deleted_at: string | null;
+};
 
 function normalizeInput(value: string): string {
   return value.trim().toLowerCase();
@@ -61,9 +65,14 @@ function extractTokenFromLink(rawValue: string): string {
 
   try {
     const parsedUrl = new URL(cleanValue);
-    const queryToken = parsedUrl.searchParams.get("token");
-    if (queryToken) {
-      return queryToken;
+    const explicitCode = parsedUrl.searchParams.get("coupon_code");
+    if (explicitCode) {
+      return explicitCode;
+    }
+
+    const fallbackCode = parsedUrl.searchParams.get("code");
+    if (fallbackCode) {
+      return fallbackCode;
     }
 
     const pathParts = parsedUrl.pathname.split("/").filter(Boolean);
@@ -98,14 +107,158 @@ function formatDate(dateIso: string): string {
   }).format(new Date(dateIso));
 }
 
+function isExpired(expiresAt: string): boolean {
+  const today = new Date();
+  const currentDate = new Date(
+    Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()),
+  ).getTime();
+  const expirationDate = new Date(expiresAt).getTime();
+
+  return expirationDate < currentDate;
+}
+
+function buildCustomerName(profile?: ProfileRow): string {
+  if (!profile) {
+    return "Cliente";
+  }
+
+  const first = profile.first_names?.trim() ?? "";
+  const last = profile.last_names?.trim() ?? "";
+  const full = `${first} ${last}`.trim();
+
+  return full || "Cliente";
+}
+
 export default function CouponRedemptionPage() {
   const [method, setMethod] = useState<InputMethod>("code");
   const [inputValue, setInputValue] = useState("");
-  const [coupons, setCoupons] = useState<Coupon[]>(initialCoupons);
+  const [coupons, setCoupons] = useState<Coupon[]>([]);
   const [selectedCouponId, setSelectedCouponId] = useState<string | null>(null);
-  const [feedback, setFeedback] = useState<string>(
+  const [loadingData, setLoadingData] = useState(true);
+  const [loadingError, setLoadingError] = useState<string | null>(null);
+  const [isRedeeming, setIsRedeeming] = useState(false);
+  const [feedback, setFeedback] = useState(
     "Ingresa el cupon por enlace, codigo o QR para validarlo.",
   );
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadCoupons() {
+      setLoadingData(true);
+      setLoadingError(null);
+
+      try {
+        const supabase = createClient();
+
+        const [profilesResult, ordersResult, orderItemsResult, offersResult, couponsResult] =
+          await Promise.all([
+            supabase
+              .from("profiles")
+              .select("user_id, first_names, last_names")
+              .eq("user_role", "CUSTOMER"),
+            supabase
+              .from("orders")
+              .select("order_id, customer_id, order_status, deleted_at")
+              .is("deleted_at", null)
+              .eq("order_status", "COMPLETED"),
+            supabase
+              .from("order_items")
+              .select("order_item_id, order_id, offer_id, deleted_at")
+              .is("deleted_at", null),
+            supabase.from("offers").select("offer_id, offer_title"),
+            supabase
+              .from("coupons")
+              .select(
+                "coupon_id, order_item_id, coupon_code, coupon_expires_at, coupon_redeemed_at, coupon_redeemed_by, coupon_status, deleted_at",
+              )
+              .is("deleted_at", null),
+          ]);
+
+        if (
+          profilesResult.error ||
+          ordersResult.error ||
+          orderItemsResult.error ||
+          offersResult.error ||
+          couponsResult.error
+        ) {
+          throw new Error(
+            profilesResult.error?.message ||
+              ordersResult.error?.message ||
+              orderItemsResult.error?.message ||
+              offersResult.error?.message ||
+              couponsResult.error?.message ||
+              "No se pudo cargar cupones.",
+          );
+        }
+
+        const profiles = (profilesResult.data ?? []) as ProfileRow[];
+        const orders = (ordersResult.data ?? []) as OrderRow[];
+        const orderItems = (orderItemsResult.data ?? []) as OrderItemRow[];
+        const offers = (offersResult.data ?? []) as OfferRow[];
+        const couponRows = (couponsResult.data ?? []) as CouponRow[];
+
+        const profileMap = new Map(profiles.map((profile) => [profile.user_id, profile]));
+        const orderMap = new Map(orders.map((order) => [order.order_id, order]));
+        const orderItemMap = new Map(
+          orderItems.map((orderItem) => [orderItem.order_item_id, orderItem]),
+        );
+        const offerMap = new Map(offers.map((offer) => [offer.offer_id, offer]));
+
+        const nextCoupons: Coupon[] = [];
+
+        for (const coupon of couponRows) {
+          const orderItem = orderItemMap.get(coupon.order_item_id);
+          if (!orderItem) {
+            continue;
+          }
+
+          const order = orderMap.get(orderItem.order_id);
+          if (!order) {
+            continue;
+          }
+
+          const profile = profileMap.get(order.customer_id);
+          const offerTitle = offerMap.get(orderItem.offer_id)?.offer_title ?? coupon.coupon_code;
+
+          nextCoupons.push({
+            id: coupon.coupon_id,
+            offerTitle,
+            customerName: buildCustomerName(profile),
+            code: coupon.coupon_code,
+            expiresAt: coupon.coupon_expires_at,
+            redeemedAt: coupon.coupon_redeemed_at,
+            redeemedBy: coupon.coupon_redeemed_by,
+            status: coupon.coupon_status,
+          });
+        }
+
+        if (!isMounted) {
+          return;
+        }
+
+        setCoupons(nextCoupons);
+      } catch (error) {
+        if (!isMounted) {
+          return;
+        }
+
+        setLoadingError(
+          error instanceof Error ? error.message : "No fue posible cargar cupones.",
+        );
+      } finally {
+        if (isMounted) {
+          setLoadingData(false);
+        }
+      }
+    }
+
+    loadCoupons();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const selectedCoupon = useMemo(
     () => coupons.find((coupon) => coupon.id === selectedCouponId) ?? null,
@@ -113,7 +266,7 @@ export default function CouponRedemptionPage() {
   );
 
   const redeemedCoupons = useMemo(
-    () => coupons.filter((coupon) => coupon.redeemedAt !== null),
+    () => coupons.filter((coupon) => coupon.status === "REDEEMED" || coupon.redeemedAt),
     [coupons],
   );
 
@@ -132,30 +285,22 @@ export default function CouponRedemptionPage() {
 
     if (currentMethod === "link") {
       const token = normalizeInput(extractTokenFromLink(rawValue));
-      return (
-        coupons.find((coupon) => normalizeInput(coupon.linkToken) === token) ??
-        null
-      );
+      return coupons.find((coupon) => normalizeInput(coupon.code) === token) ?? null;
     }
 
     const qrToken = normalizeInput(extractTokenFromQr(rawValue));
-    return (
-      coupons.find((coupon) => normalizeInput(coupon.qrToken) === qrToken) ?? null
-    );
+    return coupons.find((coupon) => normalizeInput(coupon.code) === qrToken) ?? null;
   }
 
   function validateCoupon(coupon: Coupon): { canRedeem: boolean; message: string } {
-    const now = Date.now();
-    const expiration = new Date(coupon.expiresAt).getTime();
-
-    if (coupon.redeemedAt) {
+    if (coupon.status === "REDEEMED" || coupon.redeemedAt) {
       return {
         canRedeem: false,
         message: "Este cupon ya fue reclamado anteriormente.",
       };
     }
 
-    if (expiration < now) {
+    if (isExpired(coupon.expiresAt)) {
       return {
         canRedeem: false,
         message: "Este cupon ya vencio y no puede canjearse.",
@@ -182,7 +327,7 @@ export default function CouponRedemptionPage() {
     setFeedback(validation.message);
   }
 
-  function handleRedeemCoupon() {
+  async function handleRedeemCoupon() {
     if (!selectedCoupon) {
       setFeedback("Primero valida un cupon antes de canjear.");
       return;
@@ -194,22 +339,64 @@ export default function CouponRedemptionPage() {
       return;
     }
 
-    const redemptionDate = new Date().toISOString();
+    const supabase = createClient();
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
 
-    setCoupons((prevCoupons) =>
-      prevCoupons.map((coupon) =>
-        coupon.id === selectedCoupon.id
-          ? {
-              ...coupon,
-              redeemedAt: redemptionDate,
-            }
-          : coupon,
-      ),
-    );
+    if (userError || !user) {
+      setFeedback("No se pudo identificar al empleado que realiza el canje.");
+      return;
+    }
 
-    setFeedback(
-      `Canje exitoso. El cupon ${selectedCoupon.code} quedo marcado como canjeado.`,
-    );
+    const now = new Date();
+    const redemptionDate = `${now.getUTCFullYear()}-${String(
+      now.getUTCMonth() + 1,
+    ).padStart(2, "0")}-${String(now.getUTCDate()).padStart(2, "0")}`;
+
+    setIsRedeeming(true);
+
+    try {
+      const { error } = await supabase
+        .from("coupons")
+        .update({
+          coupon_status: "REDEEMED",
+          coupon_redeemed_at: redemptionDate,
+          coupon_redeemed_by: user.id,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("coupon_id", selectedCoupon.id)
+        .is("deleted_at", null)
+        .eq("coupon_status", "AVAILABLE");
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      setCoupons((prevCoupons) =>
+        prevCoupons.map((coupon) =>
+          coupon.id === selectedCoupon.id
+            ? {
+                ...coupon,
+                redeemedAt: redemptionDate,
+                redeemedBy: user.id,
+                status: "REDEEMED",
+              }
+            : coupon,
+        ),
+      );
+
+      setFeedback(
+        `Canje exitoso. El cupon ${selectedCoupon.code} quedo marcado como canjeado.`,
+      );
+    } catch (error) {
+      setFeedback(
+        error instanceof Error ? error.message : "No se pudo actualizar el canje.",
+      );
+    } finally {
+      setIsRedeeming(false);
+    }
   }
 
   return (
@@ -222,6 +409,7 @@ export default function CouponRedemptionPage() {
           Valida por enlace, codigo o QR y confirma el canje solo si esta vigente y no
           ha sido usado.
         </p>
+        {loadingError ? <p className="text-sm text-red-600">Error: {loadingError}</p> : null}
       </div>
 
       <div className="rounded-2xl border border-(--border) bg-(--surface-soft) p-4">
@@ -281,16 +469,18 @@ export default function CouponRedemptionPage() {
           <button
             type="button"
             onClick={handleValidateCoupon}
-            className="rounded-xl border border-(--border) bg-(--surface) px-4 py-2 text-sm font-medium text-foreground hover:bg-(--surface-soft)"
+            disabled={loadingData || isRedeeming}
+            className="rounded-xl border border-(--border) bg-(--surface) px-4 py-2 text-sm font-medium text-foreground hover:bg-(--surface-soft) disabled:cursor-not-allowed disabled:opacity-60"
           >
             Validar
           </button>
           <button
             type="button"
             onClick={handleRedeemCoupon}
-            className="rounded-xl bg-(--brand-orange) px-4 py-2 text-sm font-semibold text-white hover:bg-(--brand-orange-strong)"
+            disabled={loadingData || isRedeeming}
+            className="rounded-xl bg-(--brand-orange) px-4 py-2 text-sm font-semibold text-white hover:bg-(--brand-orange-strong) disabled:cursor-not-allowed disabled:opacity-60"
           >
-            Canjear
+            {isRedeeming ? "Canjeando..." : "Canjear"}
           </button>
         </div>
 
@@ -318,8 +508,7 @@ export default function CouponRedemptionPage() {
                 <span className="font-medium">Expira:</span> {formatDate(selectedCoupon.expiresAt)}
               </p>
               <p>
-                <span className="font-medium">Estado:</span>{" "}
-                {selectedCoupon.redeemedAt ? "Canjeado" : "No canjeado"}
+                <span className="font-medium">Estado:</span> {selectedCoupon.status}
               </p>
               {selectedCoupon.redeemedAt ? (
                 <p>
@@ -329,9 +518,7 @@ export default function CouponRedemptionPage() {
               ) : null}
             </div>
           ) : (
-            <p className="text-sm text-(--text-muted)">
-              Aun no has validado ningun cupon.
-            </p>
+            <p className="text-sm text-(--text-muted)">Aun no has validado ningun cupon.</p>
           )}
         </section>
 
@@ -341,7 +528,9 @@ export default function CouponRedemptionPage() {
           </p>
 
           <div className="space-y-3">
-            {redeemedCoupons.length === 0 ? (
+            {loadingData ? (
+              <p className="text-sm text-(--text-muted)">Cargando cupones...</p>
+            ) : redeemedCoupons.length === 0 ? (
               <p className="text-sm text-(--text-muted)">No hay canjes registrados.</p>
             ) : (
               redeemedCoupons.map((coupon) => (
@@ -351,9 +540,7 @@ export default function CouponRedemptionPage() {
                 >
                   <p className="text-sm font-medium text-foreground">{coupon.offerTitle}</p>
                   <p className="text-xs text-(--text-muted)">{coupon.customerName}</p>
-                  <p className="mt-1 text-xs text-(--text-muted)">
-                    Codigo: {coupon.code}
-                  </p>
+                  <p className="mt-1 text-xs text-(--text-muted)">Codigo: {coupon.code}</p>
                   <p className="text-xs text-(--text-muted)">
                     Canjeado: {coupon.redeemedAt ? formatDate(coupon.redeemedAt) : "-"}
                   </p>
