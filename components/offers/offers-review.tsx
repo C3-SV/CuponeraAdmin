@@ -238,6 +238,135 @@ export function OffersReview({ initialList, companies }: OffersReviewProps) {
     await applyQueryPatch({ sortBy, sortDir: nextSortDir, page: 1 });
   }
 
+  async function handleApproveOffer(offer: OfferListItem) {
+    const confirmation = await Swal.fire({
+      icon: "question",
+      title: "Aprobar oferta",
+      text: `Se aprobara "${offer.offer_title}". Puedes dejar un comentario opcional.`,
+      input: "textarea",
+      inputPlaceholder: "Comentario opcional para la empresa",
+      showCancelButton: true,
+      confirmButtonText: "Aprobar",
+      cancelButtonText: "Cancelar",
+      confirmButtonColor: "#16a34a",
+      cancelButtonColor: "#0f3d78",
+    });
+
+    if (!confirmation.isConfirmed) {
+      return;
+    }
+
+    const result = await approveOffer(offer.offer_id, String(confirmation.value ?? ""));
+
+    if (!result.ok) {
+      await Swal.fire({
+        icon: "error",
+        title: "No se pudo aprobar",
+        text: result.message,
+        confirmButtonColor: "#0f3d78",
+      });
+      return;
+    }
+
+    await refreshCurrentList();
+    await Swal.fire({
+      icon: "success",
+      title: "Oferta aprobada",
+      text: result.message,
+      confirmButtonColor: "#0f3d78",
+    });
+  }
+
+  async function handleRejectOffer(offer: OfferListItem) {
+    const confirmation = await Swal.fire({
+      icon: "warning",
+      title: "Rechazar oferta",
+      text: `Agrega el comentario de rechazo para "${offer.offer_title}".`,
+      input: "textarea",
+      inputValue: offer.offer_rejection_reason ?? "",
+      inputPlaceholder: "Ej: Falta especificar restricciones de uso.",
+      inputValidator: (value) =>
+        value.trim().length >= 5
+          ? null
+          : "El comentario debe tener al menos 5 caracteres.",
+      showCancelButton: true,
+      confirmButtonText: "Rechazar",
+      cancelButtonText: "Cancelar",
+      confirmButtonColor: "#ef4444",
+      cancelButtonColor: "#0f3d78",
+    });
+
+    if (!confirmation.isConfirmed) {
+      return;
+    }
+
+    const result = await rejectOffer(
+      offer.offer_id,
+      String(confirmation.value ?? ""),
+    );
+
+    if (!result.ok) {
+      await Swal.fire({
+        icon: "error",
+        title: "No se pudo rechazar",
+        text: result.message,
+        confirmButtonColor: "#0f3d78",
+      });
+      return;
+    }
+
+    await refreshCurrentList();
+    await Swal.fire({
+      icon: "success",
+      title: "Oferta rechazada",
+      text: result.message,
+      confirmButtonColor: "#0f3d78",
+    });
+  }
+
+  async function handleDiscardOffer(offer: OfferListItem) {
+    const confirmation = await Swal.fire({
+      icon: "warning",
+      title: "Descartar oferta",
+      text: `Esta accion quitara "${offer.offer_title}" de los listados activos.`,
+      showCancelButton: true,
+      confirmButtonText: "Si, descartar",
+      cancelButtonText: "Cancelar",
+      confirmButtonColor: "#e26721",
+      cancelButtonColor: "#0f3d78",
+    });
+
+    if (!confirmation.isConfirmed) {
+      return;
+    }
+
+    const result = await discardOffer(offer.offer_id);
+
+    if (!result.ok) {
+      await Swal.fire({
+        icon: "error",
+        title: "No se pudo descartar",
+        text: result.message,
+        confirmButtonColor: "#0f3d78",
+      });
+      return;
+    }
+
+    const nextPage =
+      listResult.data.length === 1 && query.page > 1 ? query.page - 1 : query.page;
+    const nextQuery = { ...queryRef.current, page: nextPage };
+    queryRef.current = nextQuery;
+    setQuery(nextQuery);
+    await loadOfferList(nextQuery);
+
+    await Swal.fire({
+      icon: "success",
+      title: "Oferta descartada",
+      text: result.message,
+      confirmButtonColor: "#0f3d78",
+    });
+  }
+
   return (
     <>
       <section className="space-y-5 rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[0_6px_14px_-12px_rgba(15,23,42,0.24)] lg:p-7">
@@ -436,21 +565,21 @@ export function OffersReview({ initialList, companies }: OffersReviewProps) {
                             <>
                               <button
                                 type="button"
-                                //onClick={() => void handleApproveOffer(offer)}
+                                onClick={() => void handleApproveOffer(offer)}
                                 className="rounded-lg bg-green-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-green-700"
                               >
                                 Aprobar
                               </button>
                               <button
                                 type="button"
-                                //onClick={() => void handleRejectOffer(offer)}
+                                onClick={() => void handleRejectOffer(offer)}
                                 className="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700"
                               >
                                 Rechazar
                               </button>
                               <button
                                 type="button"
-                                //onClick={() => void handleDiscardOffer(offer)}
+                                onClick={() => void handleDiscardOffer(offer)}
                                 className="rounded-lg bg-[var(--brand-orange)] px-3 py-1.5 text-xs font-medium text-white hover:bg-[var(--brand-orange-strong)]"
                               >
                                 Descartar
