@@ -1,11 +1,8 @@
-import { ModulePlaceholder } from "@/components/dashboard/module-placeholder";
+import { listCategories } from "@/app/(admin)/(couponera-admin)/categories/actions";
+import { CategoriesCrud } from "@/components/categories/categories-crud";
 
-export default function CategoriesPage() {
-  return (
-    <ModulePlaceholder
-      title="Rubros"
-      description="Base CRUD para administrar los rubros que clasifican a las empresas ofertantes."
-      ownerHint="Responsable: Persona 2"
-    />
-  );
+export default async function CategoriesPage() {
+  const initialList = await listCategories();
+
+  return <CategoriesCrud initialList={initialList} />;
 }

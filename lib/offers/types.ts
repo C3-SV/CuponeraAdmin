@@ -52,6 +52,26 @@ export type OfferListItem = {
   deleted_at: string | null;
 };
 
+export type OfferImage = {
+  offer_carousel_image_id: string;
+  image_url: string;
+  image_alt_text: string | null;
+  image_sort_order: number;
+  main_image: boolean;
+};
+
+export type OfferListDetail = {
+  offer_list_detail_id: string;
+  item_title: string;
+  item_description: string;
+  item_sort_order: number;
+};
+
+export type OfferDetail = OfferListItem & {
+  images: OfferImage[];
+  list_details: OfferListDetail[];
+};
+
 export type OffersListResponse = {
   data: OfferListItem[];
   total: number;
