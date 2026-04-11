@@ -27,12 +27,16 @@ function normalizeImage(image: OfferImageFormInput): OfferImageFormInput {
   };
 }
 
+function normalizeDecimalValue(value: string): string {
+  return value.trim().replace(/,/g, ".");
+}
+
 export function normalizeOfferInput(input: OfferFormInput): OfferFormInput {
   return {
     offer_title: input.offer_title.trim(),
     offer_description: input.offer_description.trim(),
-    offer_regular_price: input.offer_regular_price.trim(),
-    offer_price: input.offer_price.trim(),
+    offer_regular_price: normalizeDecimalValue(input.offer_regular_price),
+    offer_price: normalizeDecimalValue(input.offer_price),
     offer_start_date: input.offer_start_date.trim(),
     offer_end_date: input.offer_end_date.trim(),
     coupon_usage_deadline: input.coupon_usage_deadline.trim(),
@@ -110,7 +114,9 @@ export function validateOfferInput(
       "La fecha limite de uso debe ser igual o posterior al fin de la oferta.";
   }
 
-  if (normalized.coupon_quantity_limit) {
+  if (!normalized.coupon_quantity_limit) {
+    errors.coupon_quantity_limit = "La cantidad limite es obligatoria.";
+  } else {
     const quantityLimit = Number(normalized.coupon_quantity_limit);
 
     if (!Number.isInteger(quantityLimit) || quantityLimit < 0) {
