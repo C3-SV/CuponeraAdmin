@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 
 type InputMethod = "link" | "code" | "qr";
 type CouponStatus = "disponible" | "canjeado" | "vencido";
+type RedeemedSort = "newest" | "oldest";
 
 type Coupon = {
   id: string;
@@ -155,6 +156,7 @@ function formatDate(dateIso: string): string {
 }
 
 export default function CouponRedemptionPage() {
+  const REDEEMED_PAGE_SIZE = 5;
   const [method, setMethod] = useState<InputMethod>("code");
   const [inputValue, setInputValue] = useState("");
   const [coupons, setCoupons] = useState<Coupon[]>([]);
@@ -162,6 +164,8 @@ export default function CouponRedemptionPage() {
   const [loadingData, setLoadingData] = useState(true);
   const [loadingError, setLoadingError] = useState<string | null>(null);
   const [savingCouponId, setSavingCouponId] = useState<string | null>(null);
+  const [redeemedSort, setRedeemedSort] = useState<RedeemedSort>("newest");
+  const [redeemedPage, setRedeemedPage] = useState(1);
   const [feedback, setFeedback] = useState<string>(
     "Ingresa el cupon por enlace, codigo o QR para validarlo.",
   );
@@ -281,10 +285,31 @@ export default function CouponRedemptionPage() {
     [coupons, selectedCouponId],
   );
 
-  const redeemedCoupons = useMemo(
-    () => coupons.filter((coupon) => coupon.redeemedAt !== null),
-    [coupons],
+  const redeemedCoupons = useMemo(() => {
+    const redeemed = coupons.filter((coupon) => coupon.redeemedAt !== null);
+
+    redeemed.sort((a, b) => {
+      const aTime = a.redeemedAt ? new Date(a.redeemedAt).getTime() : 0;
+      const bTime = b.redeemedAt ? new Date(b.redeemedAt).getTime() : 0;
+      return redeemedSort === "newest" ? bTime - aTime : aTime - bTime;
+    });
+
+    return redeemed;
+  }, [coupons, redeemedSort]);
+
+  const redeemedTotalPages = useMemo(
+    () => Math.max(1, Math.ceil(redeemedCoupons.length / REDEEMED_PAGE_SIZE)),
+    [redeemedCoupons.length],
   );
+
+  const paginatedRedeemedCoupons = useMemo(() => {
+    const start = (redeemedPage - 1) * REDEEMED_PAGE_SIZE;
+    return redeemedCoupons.slice(start, start + REDEEMED_PAGE_SIZE);
+  }, [redeemedCoupons, redeemedPage]);
+
+  useEffect(() => {
+    setRedeemedPage((previous) => Math.min(previous, redeemedTotalPages));
+  }, [redeemedTotalPages]);
 
   useEffect(() => {
     void loadCoupons();
@@ -509,8 +534,8 @@ export default function CouponRedemptionPage() {
         <p className="mt-3 text-sm text-(--text-muted)">{feedback}</p>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
-        <section className="rounded-2xl border border-(--border) bg-(--surface) p-4">
+      <div className="grid items-start gap-4 lg:grid-cols-[1.1fr_0.9fr]">
+        <section className="self-start rounded-2xl border border-(--border) bg-(--surface) p-4">
           <p className="mb-3 text-xs font-semibold uppercase tracking-[0.08em] text-(--text-muted)">
             Resultado de validacion
           </p>
@@ -552,16 +577,29 @@ export default function CouponRedemptionPage() {
           )}
         </section>
 
-        <section className="rounded-2xl border border-(--border) bg-(--surface) p-4">
-          <p className="mb-3 text-xs font-semibold uppercase tracking-[0.08em] text-(--text-muted)">
-            Canjes recientes ({redeemedCoupons.length})
-          </p>
+        <section className="self-start rounded-2xl border border-(--border) bg-(--surface) p-4">
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <p className="text-xs font-semibold uppercase tracking-[0.08em] text-(--text-muted)">
+              Canjes recientes ({redeemedCoupons.length})
+            </p>
+            <select
+              value={redeemedSort}
+              onChange={(event) => {
+                setRedeemedSort(event.target.value as RedeemedSort);
+                setRedeemedPage(1);
+              }}
+              className="h-8 rounded-lg border border-(--border) bg-(--surface) px-2 text-xs text-(--text-muted)"
+            >
+              <option value="newest">Mas reciente</option>
+              <option value="oldest">Mas antiguo</option>
+            </select>
+          </div>
 
           <div className="space-y-3">
             {redeemedCoupons.length === 0 ? (
               <p className="text-sm text-(--text-muted)">No hay canjes registrados.</p>
             ) : (
-              redeemedCoupons.map((coupon) => (
+              paginatedRedeemedCoupons.map((coupon) => (
                 <article
                   key={coupon.id}
                   className="rounded-xl border border-(--border) bg-(--surface-soft) p-3"
@@ -581,6 +619,37 @@ export default function CouponRedemptionPage() {
               ))
             )}
           </div>
+
+          {redeemedCoupons.length > 0 ? (
+            <div className="mt-3 flex items-center justify-between gap-2">
+              <p className="text-xs text-(--text-muted)">
+                Mostrando {paginatedRedeemedCoupons.length} de {redeemedCoupons.length}
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setRedeemedPage((page) => Math.max(1, page - 1))}
+                  disabled={redeemedPage === 1}
+                  className="rounded-lg border border-(--border) px-2.5 py-1 text-xs text-(--text-muted) disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Anterior
+                </button>
+                <span className="text-xs text-(--text-muted)">
+                  Pagina {redeemedPage} de {redeemedTotalPages}
+                </span>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setRedeemedPage((page) => Math.min(redeemedTotalPages, page + 1))
+                  }
+                  disabled={redeemedPage === redeemedTotalPages}
+                  className="rounded-lg border border-(--border) px-2.5 py-1 text-xs text-(--text-muted) disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Siguiente
+                </button>
+              </div>
+            </div>
+          ) : null}
         </section>
       </div>
     </section>

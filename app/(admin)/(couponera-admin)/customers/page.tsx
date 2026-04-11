@@ -134,12 +134,14 @@ function buildCustomerName(profile?: ProfileRow): string {
 }
 
 export default function CustomersPage() {
+  const PAGE_SIZE = 10;
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [couponsByCustomer, setCouponsByCustomer] = useState<
     Record<string, CustomerCoupon[]>
   >({});
   const [loadingData, setLoadingData] = useState(true);
   const [loadingError, setLoadingError] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [detailModalOpen, setDetailModalOpen] = useState(false);
   const [couponModalOpen, setCouponModalOpen] = useState(false);
@@ -319,6 +321,20 @@ export default function CustomersPage() {
     [selectedCustomerCoupons],
   );
 
+  const totalPages = useMemo(
+    () => Math.max(1, Math.ceil(customers.length / PAGE_SIZE)),
+    [customers.length],
+  );
+
+  const paginatedCustomers = useMemo(() => {
+    const start = (currentPage - 1) * PAGE_SIZE;
+    return customers.slice(start, start + PAGE_SIZE);
+  }, [customers, currentPage]);
+
+  useEffect(() => {
+    setCurrentPage((previousPage) => Math.min(previousPage, totalPages));
+  }, [totalPages]);
+
   useEffect(() => {
     function handleEscape(event: KeyboardEvent) {
       if (event.key !== "Escape") {
@@ -422,7 +438,7 @@ export default function CustomersPage() {
                 </tr>
               ) : null}
 
-              {customers.map((customer) => (
+              {paginatedCustomers.map((customer) => (
                 <tr key={customer.id} className="hover:bg-(--surface-soft)/70">
                   <td className="px-4 py-3">
                     <p className="text-sm font-medium text-foreground">
@@ -468,6 +484,38 @@ export default function CustomersPage() {
             </tbody>
           </table>
         </div>
+
+        {!loadingData && customers.length > 0 ? (
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-(--border) bg-(--surface-soft) px-4 py-3">
+            <p className="text-xs text-(--text-muted)">
+              Mostrando {paginatedCustomers.length} de {customers.length} clientes
+            </p>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+                disabled={currentPage === 1}
+                className="rounded-lg border border-(--border) px-3 py-1.5 text-xs font-medium text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Anterior
+              </button>
+
+              <span className="text-xs font-medium text-(--text-muted)">
+                Pagina {currentPage} de {totalPages}
+              </span>
+
+              <button
+                type="button"
+                onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+                disabled={currentPage === totalPages}
+                className="rounded-lg border border-(--border) px-3 py-1.5 text-xs font-medium text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Siguiente
+              </button>
+            </div>
+          </div>
+        ) : null}
       </section>
 
       {detailModalOpen && selectedCustomer ? (
