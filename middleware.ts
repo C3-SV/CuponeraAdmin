@@ -63,7 +63,7 @@ export async function middleware(request: NextRequest) {
   // Si ya inició sesión y trata de volver al login
   if (user && pathname === "/auth/login") {
     const url = request.nextUrl.clone();
-    url.pathname = "/dashboard";
+    url.pathname = "/profile";
     return NextResponse.redirect(url);
   }
 

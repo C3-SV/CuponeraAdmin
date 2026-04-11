@@ -23,6 +23,7 @@ export type AssignedAdminSummary = {
   last_names: string;
   full_name: string;
   email: string | null;
+  phone: string | null;
   user_is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -50,6 +51,7 @@ export type CompanyAdminCreateInput = {
   first_names: string;
   last_names: string;
   email: string;
+  phone: string;
   password: string;
   user_is_active: boolean;
 };
@@ -59,6 +61,7 @@ export type CompanyAdminUpdateInput = {
   first_names: string;
   last_names: string;
   email: string;
+  phone: string;
   user_is_active: boolean;
 };
 

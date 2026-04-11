@@ -7,6 +7,7 @@ type CompanyAdminCreateErrors = Partial<Record<keyof CompanyAdminCreateInput, st
 type CompanyAdminUpdateErrors = Partial<Record<keyof CompanyAdminUpdateInput, string>>;
 
 const SIMPLE_EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const SIMPLE_PHONE_REGEX = /^\+?[0-9]{8,15}$/;
 
 // Normaliza entradas de nombre para evitar espacios residuales.
 function normalizeName(value: string): string {
@@ -21,6 +22,7 @@ export function normalizeCompanyAdminCreateInput(
     first_names: normalizeName(input.first_names),
     last_names: normalizeName(input.last_names),
     email: input.email.trim().toLowerCase(),
+    phone: input.phone.trim(),
     password: input.password.trim(),
     user_is_active: Boolean(input.user_is_active),
   };
@@ -34,6 +36,7 @@ export function normalizeCompanyAdminUpdateInput(
     first_names: normalizeName(input.first_names),
     last_names: normalizeName(input.last_names),
     email: input.email.trim().toLowerCase(),
+    phone: input.phone.trim(),
     user_is_active: Boolean(input.user_is_active),
   };
 }
@@ -56,13 +59,19 @@ export function validateCompanyAdminCreateInput(
   if (!normalized.email) {
     errors.email = "El correo es obligatorio.";
   } else if (!SIMPLE_EMAIL_REGEX.test(normalized.email)) {
-    errors.email = "Formato de correo invalido.";
+    errors.email = "Formato de correo inválido.";
+  }
+
+  if (!normalized.phone) {
+    errors.phone = "El teléfono es obligatorio.";
+  } else if (!SIMPLE_PHONE_REGEX.test(normalized.phone)) {
+    errors.phone = "Formato de teléfono inválido.";
   }
 
   if (!normalized.password) {
-    errors.password = "La contrasena es obligatoria.";
+    errors.password = "La contraseña es obligatoria.";
   } else if (normalized.password.length < 8) {
-    errors.password = "La contrasena debe tener al menos 8 caracteres.";
+    errors.password = "La contraseña debe tener al menos 8 caracteres.";
   }
 
   return {
@@ -89,7 +98,13 @@ export function validateCompanyAdminUpdateInput(
   if (!normalized.email) {
     errors.email = "El correo es obligatorio.";
   } else if (!SIMPLE_EMAIL_REGEX.test(normalized.email)) {
-    errors.email = "Formato de correo invalido.";
+    errors.email = "Formato de correo inválido.";
+  }
+
+  if (!normalized.phone) {
+    errors.phone = "El teléfono es obligatorio.";
+  } else if (!SIMPLE_PHONE_REGEX.test(normalized.phone)) {
+    errors.phone = "Formato de teléfono inválido.";
   }
 
   return {

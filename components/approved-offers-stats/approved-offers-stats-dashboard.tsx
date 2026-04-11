@@ -119,7 +119,7 @@ function BarsChart({
         return (
           <div
             key={item.offer_id}
-            className="rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] p-3"
+            className="min-w-0 rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] p-3"
           >
             <div className="flex h-36 items-end justify-center">
               <div
@@ -127,8 +127,8 @@ function BarsChart({
                 style={{ height: `${barHeight}px` }}
               />
             </div>
-            <p className="mt-3 text-xs font-medium text-[var(--text-primary)]">
-              {truncateLabel(item.offer_title, 18)}
+            <p className="mt-3 min-h-10 break-words text-xs font-medium leading-5 text-[var(--text-primary)] line-clamp-2">
+              {truncateLabel(item.offer_title, 26)}
             </p>
             <p className="mt-1 text-xs text-[var(--text-muted)]">
               {formatCurrency(item.total_revenue)}

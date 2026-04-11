@@ -14,6 +14,7 @@ export function ModulePlaceholder({
   children,
 }: ModulePlaceholderProps) {
   return (
+    // Wrapper visual comun para placeholders de modulos aun no implementados.
     <section className="rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-6 shadow-[0_6px_14px_-12px_rgba(15,23,42,0.24)] lg:p-8">
       <div className="space-y-2">
         <h1 className="text-2xl font-semibold tracking-tight text-[var(--text-primary)]">
@@ -28,6 +29,7 @@ export function ModulePlaceholder({
           </p>
         ) : null}
       </div>
+      {/* Permite renderizar contenido de ejemplo para guiar al equipo. */}
       {children ? <div className="mt-6">{children}</div> : null}
     </section>
   );

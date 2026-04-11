@@ -1,138 +1,112 @@
 export type AppRole =
-  | "couponera_admin"
-  | "company_admin"
-  | "company_employee";
+  | "ADMIN_PLATFORM"
+  | "ADMIN_COMPANY"
+  | "EMPLOYEE"
+  | "CUSTOMER";
+
+export type NavIconName =
+  | "dashboard"
+  | "shield"
+  | "tags"
+  | "building"
+  | "briefcase"
+  | "clipboard"
+  | "chart"
+  | "users"
+  | "ticket"
+  | "employees"
+  | "scan";
 
 export type NavItem = {
   href: string;
   label: string;
-  subtitle: string;
-  iconToken: string;
-  allowedRoles: AppRole[];
+  icon: NavIconName;
 };
 
 export type NavSection = {
   title: string;
+  roles: AppRole[];
   items: NavItem[];
 };
 
-const allRoles: AppRole[] = [
-  "couponera_admin",
-  "company_admin",
-  "company_employee",
-];
-
 export const NAV_SECTIONS: NavSection[] = [
   {
-    title: "Principal",
+    title: "Admin Cuponera",
+    roles: ["ADMIN_PLATFORM"],
     items: [
       {
         href: "/dashboard",
         label: "Dashboard",
-        subtitle: "Vista general base",
-        iconToken: "DB",
-        allowedRoles: allRoles,
+        icon: "dashboard",
       },
-    ],
-  },
-  {
-    title: "Admin Cuponera",
-    items: [
       {
         href: "/platform-admins",
         label: "Administradores",
-        subtitle: "CRUD de admins internos",
-        iconToken: "PA",
-        allowedRoles: ["couponera_admin"],
+        icon: "shield",
       },
       {
         href: "/categories",
         label: "Rubros",
-        subtitle: "CRUD de rubros",
-        iconToken: "RU",
-        allowedRoles: ["couponera_admin"],
+        icon: "tags",
       },
       {
         href: "/companies",
         label: "Empresas",
-        subtitle: "CRUD de empresas ofertantes",
-        iconToken: "EM",
-        allowedRoles: ["couponera_admin"],
+        icon: "building",
       },
       {
         href: "/company-admin-assignment",
-        label: "Admin Empresa",
-        subtitle: "CRUD + Vinculacion de profiles",
-        iconToken: "AE",
-        allowedRoles: ["couponera_admin"],
+        label: "Contactos empresas",
+        icon: "briefcase",
       },
       {
         href: "/offers-review",
-        label: "Revision de Ofertas",
-        subtitle: "Aprobar, rechazar y comentar",
-        iconToken: "OF",
-        allowedRoles: ["couponera_admin"],
+        label: "Revisión de ofertas",
+        icon: "clipboard",
       },
       {
         href: "/approved-offers-stats",
-        label: "Estadisticas de Ofertas",
-        subtitle: "Ventas, disponibles y comision",
-        iconToken: "ST",
-        allowedRoles: ["couponera_admin"],
+        label: "Métricas",
+        icon: "chart",
       },
       {
         href: "/customers",
-        label: "Clientes y Cupones",
-        subtitle: "Listado, detalle y estado",
-        iconToken: "CL",
-        allowedRoles: ["couponera_admin"],
+        label: "Clientes",
+        icon: "users",
       },
     ],
   },
   {
     title: "Admin Empresa",
+    roles: ["ADMIN_COMPANY"],
     items: [
       {
         href: "/company-offers",
-        label: "Ofertas de Mi Empresa",
-        subtitle: "Crear y actualizar ofertas",
-        iconToken: "OM",
-        allowedRoles: ["company_admin"],
+        label: "Mis ofertas",
+        icon: "ticket",
       },
       {
         href: "/company-employees",
         label: "Empleados",
-        subtitle: "CRUD de empleados",
-        iconToken: "EP",
-        allowedRoles: ["company_admin"],
+        icon: "employees",
       },
     ],
   },
   {
     title: "Empleado Empresa",
+    roles: ["EMPLOYEE"],
     items: [
       {
         href: "/coupon-redemption",
-        label: "Canje de Cupon",
-        subtitle: "Validacion por codigo, enlace o QR",
-        iconToken: "CJ",
-        allowedRoles: ["company_employee"],
+        label: "Canje de cupón",
+        icon: "scan",
       },
     ],
   },
 ];
 
 export function getVisibleSections(activeRole?: AppRole | null): NavSection[] {
-  if (!activeRole) {
-    return NAV_SECTIONS;
-  }
+  if (!activeRole) return [];
 
-  return NAV_SECTIONS
-    .map((section) => ({
-      ...section,
-      items: section.items.filter((item) =>
-        item.allowedRoles.includes(activeRole),
-      ),
-    }))
-    .filter((section) => section.items.length > 0);
+  return NAV_SECTIONS.filter((section) => section.roles.includes(activeRole));
 }
