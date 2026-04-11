@@ -1,3 +1,4 @@
+// Campos habilitados para ordenamiento del listado principal.
 export type ApprovedOfferStatsSortBy =
   | "offer_title"
   | "company_name"
@@ -12,6 +13,7 @@ export type ApprovedOfferStatsSortBy =
 
 export type SortDirection = "asc" | "desc";
 
+// Query params del modulo de estadisticas con busqueda/filtro/paginacion.
 export type ApprovedOfferStatsQueryParams = {
   search: string;
   companyId: string;
@@ -22,17 +24,20 @@ export type ApprovedOfferStatsQueryParams = {
   pageSize: number;
 };
 
+// Opcion de filtro generica para selects de empresa/categoria.
 export type ApprovedOfferStatsFilterOption = {
   id: string;
   name: string;
   icon_url?: string | null;
 };
 
+// Conjunto de filtros precargados para la vista cliente.
 export type ApprovedOfferStatsFilters = {
   companies: ApprovedOfferStatsFilterOption[];
   categories: ApprovedOfferStatsFilterOption[];
 };
 
+// Fila normalizada por oferta aprobada con metricas calculadas.
 export type ApprovedOfferStatsItem = {
   offer_id: string;
   offer_title: string;
@@ -53,6 +58,7 @@ export type ApprovedOfferStatsItem = {
   service_fee: number;
 };
 
+// KPIs agregados del resultado actual (segun filtros activos).
 export type ApprovedOfferStatsKpis = {
   total_approved_offers: number;
   total_sold_coupons: number;
@@ -62,12 +68,14 @@ export type ApprovedOfferStatsKpis = {
   unlimited_offers_count: number;
 };
 
+// Estructura base para grafico de barras de ingresos.
 export type ApprovedOfferRevenueBar = {
   offer_id: string;
   offer_title: string;
   total_revenue: number;
 };
 
+// Contrato de datos para visualizaciones auxiliares del dashboard.
 export type ApprovedOfferStatsCharts = {
   top_revenue_offers: ApprovedOfferRevenueBar[];
   sold_vs_available: {
@@ -77,6 +85,7 @@ export type ApprovedOfferStatsCharts = {
   };
 };
 
+// Respuesta completa del listado + KPIs + graficos.
 export type ApprovedOfferStatsResponse = {
   data: ApprovedOfferStatsItem[];
   total: number;
