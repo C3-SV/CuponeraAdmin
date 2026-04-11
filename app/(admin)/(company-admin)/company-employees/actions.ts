@@ -17,7 +17,6 @@ import {
   validateEmployeeInput,
 } from "@/lib/company-employees/validation";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { createClient } from "@/lib/supabase/server";
 
 type EmployeeProfileRow = {
   user_id: string;
@@ -40,7 +39,7 @@ const SORT_DIRECTIONS: SortDirection[] = ["asc", "desc"];
 
 const DEFAULT_QUERY: EmployeeQueryParams = {
   search: "",
-  status: "active",
+  status: "all",
   sortBy: "first_names",
   sortDir: "asc",
   page: 1,
@@ -91,6 +90,14 @@ function normalizeQueryParams(
   };
 }
 
+function getSearchTerms(search: string): string[] {
+  return search
+    .split(/\s+/)
+    .map((term) => term.replace(/[%,]/g, "").trim())
+    .filter(Boolean)
+    .slice(0, 5);
+}
+
 async function toEmployeeListItem(
   row: EmployeeProfileRow,
 ): Promise<EmployeeListItem> {
@@ -121,7 +128,7 @@ async function getEmployeeProfileForCompany(
   userId: string,
   companyId: string,
 ): Promise<EmployeeProfileRow | null> {
-  const supabase = await createClient();
+  const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("profiles")
     .select(
@@ -162,7 +169,7 @@ export async function listCompanyEmployees(
       };
     }
 
-    const supabase = await createClient();
+    const supabase = createAdminClient();
     let query = supabase
       .from("profiles")
       .select(
@@ -179,9 +186,10 @@ export async function listCompanyEmployees(
       query = query.eq("user_is_active", false);
     }
 
-    if (params.search) {
+    const searchTerms = getSearchTerms(params.search);
+    for (const term of searchTerms) {
       query = query.or(
-        `first_names.ilike.%${params.search}%,last_names.ilike.%${params.search}%`,
+        `first_names.ilike.%${term}%,last_names.ilike.%${term}%`,
       );
     }
 
@@ -299,8 +307,7 @@ export async function createCompanyEmployee(
       };
     }
 
-    const supabase = await createClient();
-    const { error: profileError } = await supabase.from("profiles").insert({
+    const { error: profileError } = await supabaseAdmin.from("profiles").insert({
       user_id: authData.user.id,
       first_names: normalized.first_names,
       last_names: normalized.last_names,
@@ -391,8 +398,7 @@ export async function updateCompanyEmployee(
       };
     }
 
-    const supabase = await createClient();
-    const { error } = await supabase
+    const { error } = await supabaseAdmin
       .from("profiles")
       .update({
         first_names: normalized.first_names,
@@ -441,8 +447,8 @@ export async function softDeleteCompanyEmployee(
       return { ok: false, message: context.message };
     }
 
-    const supabase = await createClient();
-    const { error } = await supabase
+    const supabaseAdmin = createAdminClient();
+    const { error } = await supabaseAdmin
       .from("profiles")
       .update({
         user_is_active: false,

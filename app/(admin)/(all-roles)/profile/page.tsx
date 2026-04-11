@@ -1,6 +1,7 @@
 // app/(admin)/(all-roles)/profile/page.tsx
 import { requireAdminProfile } from "@/lib/auth";
 import { logoutAction } from "@/app/auth/logout/actions";
+import { formatUserRole } from "@/lib/roles";
 
 export default async function ProfilePage() {
   const profile = await requireAdminProfile();
@@ -13,7 +14,7 @@ export default async function ProfilePage() {
         <p><strong>Nombres:</strong> {profile.first_names}</p>
         <p><strong>Apellidos:</strong> {profile.last_names}</p>
         <p><strong>Correo:</strong> {profile.email}</p>
-        <p><strong>Rol:</strong> {profile.user_role}</p>
+        <p><strong>Rol:</strong> {formatUserRole(profile.user_role)}</p>
         <p><strong>Activo:</strong> {profile.user_is_active ? "Sí" : "No"}</p>
         <p><strong>Empresa:</strong> {profile.company_id ?? "No aplica"}</p>
       </div>
