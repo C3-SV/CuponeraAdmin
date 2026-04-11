@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import Swal from "sweetalert2";
 
 type InputMethod = "link" | "code" | "qr";
 type CouponStatus = "disponible" | "canjeado" | "vencido";
@@ -155,8 +156,17 @@ function formatDate(dateIso: string): string {
   }).format(new Date(dateIso));
 }
 
+function getLookupToken(currentMethod: InputMethod, rawValue: string): string {
+  if (currentMethod === "code") {
+    return rawValue.trim();
+  }
+
+  return currentMethod === "link"
+    ? extractTokenFromLink(rawValue).trim()
+    : extractTokenFromQr(rawValue).trim();
+}
+
 export default function CouponRedemptionPage() {
-  const REDEEMED_PAGE_SIZE = 5;
   const [method, setMethod] = useState<InputMethod>("code");
   const [inputValue, setInputValue] = useState("");
   const [coupons, setCoupons] = useState<Coupon[]>([]);
@@ -165,6 +175,8 @@ export default function CouponRedemptionPage() {
   const [loadingError, setLoadingError] = useState<string | null>(null);
   const [savingCouponId, setSavingCouponId] = useState<string | null>(null);
   const [redeemedSort, setRedeemedSort] = useState<RedeemedSort>("newest");
+  const [redeemedSearchInput, setRedeemedSearchInput] = useState("");
+  const [redeemedPageSize, setRedeemedPageSize] = useState(5);
   const [redeemedPage, setRedeemedPage] = useState(1);
   const [feedback, setFeedback] = useState<string>(
     "Ingresa el cupon por enlace, codigo o QR para validarlo.",
@@ -250,7 +262,6 @@ export default function CouponRedemptionPage() {
         }
 
         const offerTitle = offerMap.get(orderItem.offer_id)?.offer_title ?? coupon.coupon_code;
-        const customerProfile = customerProfileMap.get(order.customer_id);
         const profile = profileMap.get(order.customer_id);
 
         nextCoupons.push({
@@ -288,24 +299,34 @@ export default function CouponRedemptionPage() {
   const redeemedCoupons = useMemo(() => {
     const redeemed = coupons.filter((coupon) => coupon.redeemedAt !== null);
 
-    redeemed.sort((a, b) => {
+    const query = redeemedSearchInput.trim().toLowerCase();
+    const filtered = query
+      ? redeemed.filter((coupon) => {
+          return [coupon.offerTitle, coupon.customerName, coupon.code, coupon.redeemedBy ?? ""]
+            .join(" ")
+            .toLowerCase()
+            .includes(query);
+        })
+      : redeemed;
+
+    filtered.sort((a, b) => {
       const aTime = a.redeemedAt ? new Date(a.redeemedAt).getTime() : 0;
       const bTime = b.redeemedAt ? new Date(b.redeemedAt).getTime() : 0;
       return redeemedSort === "newest" ? bTime - aTime : aTime - bTime;
     });
 
-    return redeemed;
-  }, [coupons, redeemedSort]);
+    return filtered;
+  }, [coupons, redeemedSort, redeemedSearchInput]);
 
   const redeemedTotalPages = useMemo(
-    () => Math.max(1, Math.ceil(redeemedCoupons.length / REDEEMED_PAGE_SIZE)),
-    [redeemedCoupons.length],
+    () => Math.max(1, Math.ceil(redeemedCoupons.length / redeemedPageSize)),
+    [redeemedCoupons.length, redeemedPageSize],
   );
 
   const paginatedRedeemedCoupons = useMemo(() => {
-    const start = (redeemedPage - 1) * REDEEMED_PAGE_SIZE;
-    return redeemedCoupons.slice(start, start + REDEEMED_PAGE_SIZE);
-  }, [redeemedCoupons, redeemedPage]);
+    const start = (redeemedPage - 1) * redeemedPageSize;
+    return redeemedCoupons.slice(start, start + redeemedPageSize);
+  }, [redeemedCoupons, redeemedPage, redeemedPageSize]);
 
   useEffect(() => {
     setRedeemedPage((previous) => Math.min(previous, redeemedTotalPages));
@@ -320,23 +341,136 @@ export default function CouponRedemptionPage() {
       return null;
     }
 
-    const normalizedValue = normalizeInput(rawValue);
+    const normalizedValue = normalizeInput(getLookupToken(currentMethod, rawValue));
 
     if (currentMethod === "code") {
       return coupons.find((coupon) => normalizeInput(coupon.code) === normalizedValue) ?? null;
     }
 
-    const token =
-      currentMethod === "link"
-        ? normalizeInput(extractTokenFromLink(rawValue))
-        : normalizeInput(extractTokenFromQr(rawValue));
-
     return (
       coupons.find(
         (coupon) =>
-          normalizeInput(coupon.code) === token || normalizeInput(coupon.id) === token,
+          normalizeInput(coupon.code) === normalizedValue ||
+          normalizeInput(coupon.id) === normalizedValue,
       ) ?? null
     );
+  }
+
+  async function fetchCouponByInputFromDatabase(
+    currentMethod: InputMethod,
+    rawValue: string,
+  ): Promise<Coupon | null> {
+    const token = getLookupToken(currentMethod, rawValue);
+    if (!token) {
+      return null;
+    }
+
+    const supabase = createClient();
+
+    let couponRow: CouponRow | null = null;
+
+    if (currentMethod === "code") {
+      const { data } = await supabase
+        .from("coupons")
+        .select(
+          "coupon_id, order_item_id, coupon_code, coupon_issued_at, coupon_expires_at, coupon_redeemed_at, coupon_redeemed_by, coupon_status, deleted_at",
+        )
+        .is("deleted_at", null)
+        .ilike("coupon_code", token)
+        .limit(1)
+        .maybeSingle();
+      couponRow = (data as CouponRow | null) ?? null;
+    } else {
+      const byIdResult = await supabase
+        .from("coupons")
+        .select(
+          "coupon_id, order_item_id, coupon_code, coupon_issued_at, coupon_expires_at, coupon_redeemed_at, coupon_redeemed_by, coupon_status, deleted_at",
+        )
+        .is("deleted_at", null)
+        .eq("coupon_id", token)
+        .maybeSingle();
+
+      couponRow = (byIdResult.data as CouponRow | null) ?? null;
+
+      if (!couponRow) {
+        const byCodeResult = await supabase
+          .from("coupons")
+          .select(
+            "coupon_id, order_item_id, coupon_code, coupon_issued_at, coupon_expires_at, coupon_redeemed_at, coupon_redeemed_by, coupon_status, deleted_at",
+          )
+          .is("deleted_at", null)
+          .ilike("coupon_code", token)
+          .limit(1)
+          .maybeSingle();
+
+        couponRow = (byCodeResult.data as CouponRow | null) ?? null;
+      }
+    }
+
+    if (!couponRow) {
+      return null;
+    }
+
+    const { data: orderItem } = await supabase
+      .from("order_items")
+      .select("order_item_id, order_id, offer_id, created_at, deleted_at")
+      .eq("order_item_id", couponRow.order_item_id)
+      .is("deleted_at", null)
+      .maybeSingle();
+
+    if (!orderItem) {
+      return {
+        id: couponRow.coupon_id,
+        offerTitle: couponRow.coupon_code,
+        customerName: "Cliente",
+        code: couponRow.coupon_code,
+        expiresAt: couponRow.coupon_expires_at,
+        redeemedAt: couponRow.coupon_redeemed_at,
+        redeemedBy: couponRow.coupon_redeemed_by,
+        customerId: "",
+      };
+    }
+
+    const [orderResult, offerResult] = await Promise.all([
+      supabase
+        .from("orders")
+        .select("order_id, customer_id, order_status, deleted_at")
+        .eq("order_id", orderItem.order_id)
+        .is("deleted_at", null)
+        .maybeSingle(),
+      supabase
+        .from("offers")
+        .select("offer_id, offer_title")
+        .eq("offer_id", orderItem.offer_id)
+        .maybeSingle(),
+    ]);
+
+    const order = orderResult.data as OrderRow | null;
+    const offer = offerResult.data as OfferRow | null;
+
+    let customerName = "Cliente";
+    let customerId = order?.customer_id ?? "";
+
+    if (order?.customer_id) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("user_id, first_names, last_names, user_is_active, created_at")
+        .eq("user_id", order.customer_id)
+        .maybeSingle();
+
+      customerName = buildCustomerName((profile as ProfileRow | null) ?? undefined);
+    }
+
+    return {
+      id: couponRow.coupon_id,
+      offerTitle: offer?.offer_title ?? couponRow.coupon_code,
+      customerName,
+      code: couponRow.coupon_code,
+      expiresAt: couponRow.coupon_expires_at,
+      redeemedAt: couponRow.coupon_redeemed_at,
+      redeemedBy: couponRow.coupon_redeemed_by,
+      customerId,
+    };
   }
 
   function validateCoupon(coupon: Coupon): { canRedeem: boolean; message: string } {
@@ -366,12 +500,24 @@ export default function CouponRedemptionPage() {
   async function handleRedeemCoupon() {
     if (!selectedCoupon) {
       setFeedback("Primero valida un cupon antes de canjear.");
+      await Swal.fire({
+        icon: "info",
+        title: "Sin cupon validado",
+        text: "Primero valida un cupon antes de canjear.",
+        confirmButtonColor: "#0f3d78",
+      });
       return;
     }
 
     const validation = validateCoupon(selectedCoupon);
     if (!validation.canRedeem) {
       setFeedback(validation.message);
+      await Swal.fire({
+        icon: "warning",
+        title: "Canje no permitido",
+        text: validation.message,
+        confirmButtonColor: "#0f3d78",
+      });
       return;
     }
 
@@ -389,6 +535,12 @@ export default function CouponRedemptionPage() {
 
       if (authError || !user) {
         setFeedback("No se pudo identificar al usuario autenticado.");
+        await Swal.fire({
+          icon: "error",
+          title: "Sesion invalida",
+          text: "No se pudo identificar al usuario autenticado.",
+          confirmButtonColor: "#0f3d78",
+        });
         return;
       }
 
@@ -411,38 +563,81 @@ export default function CouponRedemptionPage() {
       }
 
       if (!updatedCoupon) {
-        throw new Error(
-          "No se pudo canjear: puede estar vencido, ya canjeado o sin permisos por politicas (RLS).",
-        );
+        const message =
+          "No se pudo canjear: puede estar vencido, ya canjeado o sin permisos por politicas (RLS).";
+        throw new Error(message);
       }
 
       setFeedback(
         `Canje exitoso. El cupon ${selectedCoupon.code} quedo marcado como canjeado.`,
       );
+      await Swal.fire({
+        icon: "success",
+        title: "Canje exitoso",
+        text: `El cupon ${selectedCoupon.code} quedo marcado como canjeado.`,
+        confirmButtonColor: "#0f3d78",
+      });
       setInputValue("");
       setSelectedCouponId(null);
       await loadCoupons();
     } catch (error) {
-      setFeedback(
-        error instanceof Error ? error.message : "No se pudo completar el canje.",
-      );
+      const message =
+        error instanceof Error ? error.message : "No se pudo completar el canje.";
+      setFeedback(message);
+      await Swal.fire({
+        icon: "error",
+        title: "Error al canjear",
+        text: message,
+        confirmButtonColor: "#0f3d78",
+      });
     } finally {
       setSavingCouponId(null);
     }
   }
 
-  function handleValidateCoupon() {
-    const foundCoupon = findCouponByInput(method, inputValue);
+  async function handleValidateCoupon() {
+    let foundCoupon = findCouponByInput(method, inputValue);
+
+    if (!foundCoupon) {
+      foundCoupon = await fetchCouponByInputFromDatabase(method, inputValue);
+      if (foundCoupon) {
+        setCoupons((previousCoupons) => {
+          const existingIndex = previousCoupons.findIndex(
+            (coupon) => coupon.id === foundCoupon?.id,
+          );
+
+          if (existingIndex === -1) {
+            return [...previousCoupons, foundCoupon as Coupon];
+          }
+
+          const nextCoupons = [...previousCoupons];
+          nextCoupons[existingIndex] = foundCoupon as Coupon;
+          return nextCoupons;
+        });
+      }
+    }
 
     if (!foundCoupon) {
       setSelectedCouponId(null);
       setFeedback("No se encontro un cupon con el dato ingresado.");
+      await Swal.fire({
+        icon: "warning",
+        title: "Cupon no encontrado",
+        text: "No se encontro un cupon con el dato ingresado.",
+        confirmButtonColor: "#0f3d78",
+      });
       return;
     }
 
     setSelectedCouponId(foundCoupon.id);
     const validation = validateCoupon(foundCoupon);
     setFeedback(validation.message);
+    await Swal.fire({
+      icon: validation.canRedeem ? "success" : "warning",
+      title: validation.canRedeem ? "Cupon valido" : "Cupon no canjeable",
+      text: validation.message,
+      confirmButtonColor: "#0f3d78",
+    });
   }
 
   return (
@@ -582,18 +777,45 @@ export default function CouponRedemptionPage() {
             <p className="text-xs font-semibold uppercase tracking-[0.08em] text-(--text-muted)">
               Canjes recientes ({redeemedCoupons.length})
             </p>
-            <select
-              value={redeemedSort}
-              onChange={(event) => {
-                setRedeemedSort(event.target.value as RedeemedSort);
-                setRedeemedPage(1);
-              }}
-              className="h-8 rounded-lg border border-(--border) bg-(--surface) px-2 text-xs text-(--text-muted)"
-            >
-              <option value="newest">Mas reciente</option>
-              <option value="oldest">Mas antiguo</option>
-            </select>
+            <div className="flex items-center gap-2">
+              <select
+                value={redeemedSort}
+                onChange={(event) => {
+                  setRedeemedSort(event.target.value as RedeemedSort);
+                  setRedeemedPage(1);
+                }}
+                className="h-8 rounded-lg border border-(--border) bg-(--surface) px-2 text-xs text-(--text-muted)"
+              >
+                <option value="newest">Mas reciente</option>
+                <option value="oldest">Mas antiguo</option>
+              </select>
+              <select
+                value={redeemedPageSize}
+                onChange={(event) => {
+                  setRedeemedPageSize(Number(event.target.value));
+                  setRedeemedPage(1);
+                }}
+                className="h-8 rounded-lg border border-(--border) bg-(--surface) px-2 text-xs text-(--text-muted)"
+              >
+                <option value={5}>5</option>
+                <option value={10}>10</option>
+                <option value={15}>15</option>
+                <option value={20}>20</option>
+                <option value={50}>50</option>
+              </select>
+            </div>
           </div>
+
+          <input
+            type="text"
+            value={redeemedSearchInput}
+            onChange={(event) => {
+              setRedeemedSearchInput(event.target.value);
+              setRedeemedPage(1);
+            }}
+            placeholder="Buscar por oferta, cliente, codigo o usuario..."
+            className="mb-3 h-9 w-full rounded-lg border border-(--border) bg-(--surface) px-3 text-xs text-foreground outline-none"
+          />
 
           <div className="space-y-3">
             {redeemedCoupons.length === 0 ? (

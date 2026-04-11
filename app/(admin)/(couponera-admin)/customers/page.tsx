@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import Swal from "sweetalert2";
 
 type CustomerStatus = "activa" | "inactiva";
 type CouponStatus = "disponible" | "canjeado" | "vencido";
@@ -134,19 +135,25 @@ function buildCustomerName(profile?: ProfileRow): string {
 }
 
 export default function CustomersPage() {
-  const PAGE_SIZE = 10;
+  type AccountFilter = "all" | CustomerStatus;
+  type CouponFilter = "all" | CouponStatus;
+
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [couponsByCustomer, setCouponsByCustomer] = useState<
     Record<string, CustomerCoupon[]>
   >({});
   const [loadingData, setLoadingData] = useState(true);
   const [loadingError, setLoadingError] = useState<string | null>(null);
+  const [searchInput, setSearchInput] = useState("");
+  const [accountFilter, setAccountFilter] = useState<AccountFilter>("all");
+  const [couponFilter, setCouponFilter] = useState<CouponFilter>("all");
+  const [pageSize, setPageSize] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [detailModalOpen, setDetailModalOpen] = useState(false);
   const [couponModalOpen, setCouponModalOpen] = useState(false);
 
-  async function loadCustomersAndCoupons() {
+  async function loadCustomersAndCoupons(showSuccessAlert = false) {
     setLoadingData(true);
     setLoadingError(null);
 
@@ -277,10 +284,25 @@ export default function CustomersPage() {
 
       setCustomers(nextCustomers);
       setCouponsByCustomer(nextCouponsByCustomer);
+
+      if (showSuccessAlert) {
+        await Swal.fire({
+          icon: "success",
+          title: "Datos actualizados",
+          text: "Se recargaron clientes y cupones correctamente.",
+          confirmButtonColor: "#0f3d78",
+        });
+      }
     } catch (error) {
-      setLoadingError(
-        error instanceof Error ? error.message : "No fue posible cargar datos.",
-      );
+      const message =
+        error instanceof Error ? error.message : "No fue posible cargar datos.";
+      setLoadingError(message);
+      await Swal.fire({
+        icon: "error",
+        title: "Error al cargar datos",
+        text: message,
+        confirmButtonColor: "#0f3d78",
+      });
     } finally {
       setLoadingData(false);
     }
@@ -321,15 +343,44 @@ export default function CustomersPage() {
     [selectedCustomerCoupons],
   );
 
+  const filteredCustomers = useMemo(() => {
+    const query = searchInput.trim().toLowerCase();
+    return customers.filter((customer) => {
+      const matchesSearch = !query
+        ? true
+        : [
+        customer.nombreCompleto,
+        customer.id,
+        customer.telefono,
+        customer.dui,
+        customer.direccion,
+      ]
+            .join(" ")
+            .toLowerCase()
+            .includes(query);
+
+      const matchesAccount =
+        accountFilter === "all" ? true : customer.estadoCuenta === accountFilter;
+
+      const customerCoupons = couponsByCustomer[customer.id] ?? [];
+      const matchesCoupon =
+        couponFilter === "all"
+          ? true
+          : customerCoupons.some((coupon) => coupon.estado === couponFilter);
+
+      return matchesSearch && matchesAccount && matchesCoupon;
+    });
+  }, [customers, searchInput, accountFilter, couponFilter, couponsByCustomer]);
+
   const totalPages = useMemo(
-    () => Math.max(1, Math.ceil(customers.length / PAGE_SIZE)),
-    [customers.length],
+    () => Math.max(1, Math.ceil(filteredCustomers.length / pageSize)),
+    [filteredCustomers.length, pageSize],
   );
 
   const paginatedCustomers = useMemo(() => {
-    const start = (currentPage - 1) * PAGE_SIZE;
-    return customers.slice(start, start + PAGE_SIZE);
-  }, [customers, currentPage]);
+    const start = (currentPage - 1) * pageSize;
+    return filteredCustomers.slice(start, start + pageSize);
+  }, [filteredCustomers, currentPage, pageSize]);
 
   useEffect(() => {
     setCurrentPage((previousPage) => Math.min(previousPage, totalPages));
@@ -365,10 +416,20 @@ export default function CustomersPage() {
   function openCustomerCoupons(customer: Customer) {
     setSelectedCustomer(customer);
     setCouponModalOpen(true);
+
+    const customerCoupons = couponsByCustomer[customer.id] ?? [];
+    if (customerCoupons.length === 0) {
+      void Swal.fire({
+        icon: "info",
+        title: "Sin cupones",
+        text: "Este cliente no tiene cupones registrados por ahora.",
+        confirmButtonColor: "#0f3d78",
+      });
+    }
   }
 
   function refreshCustomers() {
-    void loadCustomersAndCoupons();
+    void loadCustomersAndCoupons(true);
   }
 
   function closeDetailModal() {
@@ -392,6 +453,65 @@ export default function CustomersPage() {
           {loadingError ? (
             <p className="text-sm text-red-600">Error de carga: {loadingError}</p>
           ) : null}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-(--border) bg-(--surface-soft) p-3">
+          <input
+            type="text"
+            value={searchInput}
+            onChange={(event) => {
+              setSearchInput(event.target.value);
+              setCurrentPage(1);
+            }}
+            placeholder="Buscar por nombre, DUI, telefono o direccion..."
+            className="h-10 w-full rounded-xl border border-(--border) bg-(--surface) px-3 text-sm text-foreground outline-none sm:w-[320px]"
+          />
+
+          <select
+            value={accountFilter}
+            onChange={(event) => {
+              setAccountFilter(event.target.value as AccountFilter);
+              setCurrentPage(1);
+            }}
+            className="h-10 rounded-xl border border-(--border) bg-(--surface) px-3 text-sm text-foreground"
+          >
+            <option value="all">Estado: Todos</option>
+            <option value="activa">Activa</option>
+            <option value="inactiva">Inactiva</option>
+          </select>
+
+          <select
+            value={couponFilter}
+            onChange={(event) => {
+              setCouponFilter(event.target.value as CouponFilter);
+              setCurrentPage(1);
+            }}
+            className="h-10 rounded-xl border border-(--border) bg-(--surface) px-3 text-sm text-foreground"
+          >
+            <option value="all">Cupon: Todos</option>
+            <option value="disponible">Disponible</option>
+            <option value="canjeado">Canjeado</option>
+            <option value="vencido">Vencido</option>
+          </select>
+
+          <label className="inline-flex items-center gap-2 text-xs font-medium text-(--text-muted)">
+            Mostrar
+            <select
+              value={pageSize}
+              onChange={(event) => {
+                setPageSize(Number(event.target.value));
+                setCurrentPage(1);
+              }}
+              className="h-9 rounded-lg border border-(--border) bg-(--surface) px-2 text-sm text-foreground"
+            >
+              <option value={5}>5</option>
+              <option value={10}>10</option>
+              <option value={15}>15</option>
+              <option value={20}>20</option>
+              <option value={50}>50</option>
+            </select>
+            por pagina
+          </label>
         </div>
 
         <div className="overflow-x-auto rounded-2xl border border-(--border)">
@@ -427,7 +547,7 @@ export default function CustomersPage() {
                 </tr>
               ) : null}
 
-              {!loadingData && customers.length === 0 ? (
+              {!loadingData && filteredCustomers.length === 0 ? (
                 <tr>
                   <td
                     colSpan={5}
@@ -485,10 +605,10 @@ export default function CustomersPage() {
           </table>
         </div>
 
-        {!loadingData && customers.length > 0 ? (
+        {!loadingData && filteredCustomers.length > 0 ? (
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-(--border) bg-(--surface-soft) px-4 py-3">
             <p className="text-xs text-(--text-muted)">
-              Mostrando {paginatedCustomers.length} de {customers.length} clientes
+              Mostrando {paginatedCustomers.length} de {filteredCustomers.length} clientes
             </p>
 
             <div className="flex items-center gap-2">
