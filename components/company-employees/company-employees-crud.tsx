@@ -21,6 +21,7 @@ import {
   validateEmployeeInput,
   type EmployeeFormErrors,
 } from "@/lib/company-employees/validation";
+import { formatUserRole } from "@/lib/roles";
 
 type CompanyEmployeesCrudProps = {
   initialList: EmployeesListResponse;
@@ -30,7 +31,7 @@ type FormMode = "create" | "edit";
 
 const DEFAULT_QUERY: EmployeeQueryParams = {
   search: "",
-  status: "active",
+  status: "all",
   sortBy: "first_names",
   sortDir: "asc",
   page: 1,
@@ -66,6 +67,83 @@ function ActiveBadge({ active }: { active: boolean }) {
     >
       {active ? "Activo" : "Inactivo"}
     </span>
+  );
+}
+
+function EmployeesTableSkeleton({ rows = 5 }: { rows?: number }) {
+  return (
+    <>
+      {Array.from({ length: rows }).map((_, index) => (
+        <tr key={index} className="animate-pulse">
+          <td className="px-4 py-3">
+            <div className="h-4 w-36 rounded bg-[var(--surface-soft)]" />
+            <div className="mt-2 h-3 w-20 rounded bg-[var(--surface-soft)]" />
+          </td>
+          <td className="px-4 py-3">
+            <div className="h-4 w-36 rounded bg-[var(--surface-soft)]" />
+          </td>
+          <td className="px-4 py-3">
+            <div className="h-4 w-48 rounded bg-[var(--surface-soft)]" />
+          </td>
+          <td className="px-4 py-3">
+            <div className="mx-auto h-6 w-20 rounded-full bg-[var(--surface-soft)]" />
+          </td>
+          <td className="px-4 py-3">
+            <div className="mx-auto flex justify-center gap-2">
+              <div className="h-7 w-16 rounded-lg bg-[var(--surface-soft)]" />
+              <div className="h-7 w-14 rounded-lg bg-[var(--surface-soft)]" />
+              <div className="h-7 w-20 rounded-lg bg-[var(--surface-soft)]" />
+            </div>
+          </td>
+        </tr>
+      ))}
+    </>
+  );
+}
+
+function EmployeeDetailSkeleton() {
+  return (
+    <div className="animate-pulse space-y-3 rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] p-4">
+      <div className="h-4 w-52 rounded bg-white" />
+      <div className="h-4 w-64 rounded bg-white" />
+      <div className="h-4 w-48 rounded bg-white" />
+      <div className="h-6 w-24 rounded-full bg-white" />
+      <div className="h-4 w-44 rounded bg-white" />
+      <div className="h-4 w-44 rounded bg-white" />
+    </div>
+  );
+}
+
+function StatusToggle({
+  checked,
+  onChange,
+}: {
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <label className="inline-flex items-center gap-3">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(event) => onChange(event.target.checked)}
+        className="sr-only"
+      />
+      <span
+        className={`relative inline-flex h-6 w-11 rounded-full transition-colors ${
+          checked ? "bg-[var(--brand-blue)]" : "bg-slate-300"
+        }`}
+      >
+        <span
+          className={`absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${
+            checked ? "translate-x-5" : ""
+          }`}
+        />
+      </span>
+      <span className="text-sm font-medium text-[var(--text-primary)]">
+        {checked ? "Activo" : "Inactivo"}
+      </span>
+    </label>
   );
 }
 
@@ -335,7 +413,7 @@ export function CompanyEmployeesCrud({ initialList }: CompanyEmployeesCrudProps)
             type="text"
             value={searchInput}
             onChange={(event) => setSearchInput(event.target.value)}
-            placeholder="Buscar por nombre..."
+            placeholder="Buscar por nombre o apellido..."
             className="h-10 w-full rounded-xl border border-[var(--border)] bg-white px-3 text-sm text-[var(--text-primary)] outline-none sm:w-[260px]"
           />
 
@@ -349,25 +427,9 @@ export function CompanyEmployeesCrud({ initialList }: CompanyEmployeesCrudProps)
             }
             className="h-10 rounded-xl border border-[var(--border)] bg-white px-3 text-sm text-[var(--text-primary)] outline-none"
           >
-            <option value="active">Activos</option>
-            <option value="inactive">Inactivos</option>
             <option value="all">Todos</option>
-          </select>
-
-          <select
-            value={query.sortBy}
-            onChange={(event) =>
-              void applyQueryPatch({
-                sortBy: event.target.value as EmployeeQueryParams["sortBy"],
-                page: 1,
-              })
-            }
-            className="h-10 rounded-xl border border-[var(--border)] bg-white px-3 text-sm text-[var(--text-primary)] outline-none"
-          >
-            <option value="first_names">Nombres</option>
-            <option value="last_names">Apellidos</option>
-            <option value="user_is_active">Estado</option>
-            <option value="created_at">Creacion</option>
+            <option value="active">Activos</option>
+            <option value="inactive">No activos</option>
           </select>
 
           <label className="ml-auto inline-flex items-center gap-2 text-xs font-medium text-[var(--text-muted)]">
@@ -401,7 +463,10 @@ export function CompanyEmployeesCrud({ initialList }: CompanyEmployeesCrudProps)
             <thead className="bg-[var(--surface-soft)]">
               <tr>
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">
-                  Empleado
+                  Nombres
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">
+                  Apellidos
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">
                   Correo
@@ -410,23 +475,13 @@ export function CompanyEmployeesCrud({ initialList }: CompanyEmployeesCrudProps)
                   Estado
                 </th>
                 <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">
-                  Creado
-                </th>
-                <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">
                   Acciones
                 </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--border)]">
               {isTableLoading ? (
-                <tr>
-                  <td
-                    colSpan={5}
-                    className="px-4 py-6 text-center text-sm text-[var(--text-muted)]"
-                  >
-                    Cargando empleados...
-                  </td>
-                </tr>
+                <EmployeesTableSkeleton />
               ) : null}
 
               {!isTableLoading && listResult.data.length === 0 ? (
@@ -448,20 +503,17 @@ export function CompanyEmployeesCrud({ initialList }: CompanyEmployeesCrudProps)
                     >
                       <td className="px-4 py-3 text-sm text-[var(--text-primary)]">
                         <p className="font-medium">
-                          {employee.first_names} {employee.last_names}
+                          {employee.first_names}
                         </p>
-                        <p className="text-xs text-[var(--text-muted)]">
-                          {employee.user_role}
-                        </p>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-[var(--text-primary)]">
+                        {employee.last_names}
                       </td>
                       <td className="px-4 py-3 text-sm text-[var(--text-muted)]">
                         {employee.email || "Sin correo disponible"}
                       </td>
                       <td className="px-4 py-3 text-center">
                         <ActiveBadge active={employee.user_is_active} />
-                      </td>
-                      <td className="px-4 py-3 text-center text-xs text-[var(--text-muted)]">
-                        {formatDateTime(employee.created_at)}
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex flex-wrap justify-center gap-2">
@@ -610,8 +662,8 @@ export function CompanyEmployeesCrud({ initialList }: CompanyEmployeesCrudProps)
                 <label className="space-y-1">
                   <span className="text-xs font-medium text-[var(--text-muted)]">
                     {formMode === "create"
-                      ? "Contrasena"
-                      : "Nueva contrasena (opcional)"}
+                      ? "Contraseña"
+                      : "Nueva contraseña (opcional)"}
                   </span>
                   <input
                     type="password"
@@ -627,16 +679,17 @@ export function CompanyEmployeesCrud({ initialList }: CompanyEmployeesCrudProps)
                 </label>
               </div>
 
-              <label className="inline-flex items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2 text-sm text-[var(--text-primary)]">
-                <input
-                  type="checkbox"
+              <div className="space-y-2 rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2">
+                <p className="text-xs font-medium text-[var(--text-muted)]">
+                  Estado
+                </p>
+                <StatusToggle
                   checked={formValues.user_is_active}
-                  onChange={(event) =>
-                    handleFormValueChange("user_is_active", event.target.checked)
+                  onChange={(checked) =>
+                    handleFormValueChange("user_is_active", checked)
                   }
                 />
-                Usuario activo
-              </label>
+              </div>
 
               <footer className="flex justify-end gap-2 pt-2">
                 <button
@@ -691,7 +744,7 @@ export function CompanyEmployeesCrud({ initialList }: CompanyEmployeesCrudProps)
             </header>
 
             {isDetailLoading ? (
-              <p className="text-sm text-[var(--text-muted)]">Cargando detalle...</p>
+              <EmployeeDetailSkeleton />
             ) : null}
 
             {!isDetailLoading && detailData ? (
@@ -705,7 +758,8 @@ export function CompanyEmployeesCrud({ initialList }: CompanyEmployeesCrudProps)
                   {detailData.email || "Sin correo disponible"}
                 </p>
                 <p className="text-sm text-[var(--text-primary)]">
-                  <span className="font-medium">Rol:</span> {detailData.user_role}
+                  <span className="font-medium">Rol:</span>{" "}
+                  {formatUserRole(detailData.user_role)}
                 </p>
                 <p className="text-sm text-[var(--text-primary)]">
                   <span className="font-medium">Estado:</span>{" "}

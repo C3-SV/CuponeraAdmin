@@ -4,7 +4,7 @@ import { listCompanyEmployees } from "./actions";
 export default async function CompanyEmployeesPage() {
   const initialList = await listCompanyEmployees({
     search: "",
-    status: "active",
+    status: "all",
     sortBy: "first_names",
     sortDir: "asc",
     page: 1,

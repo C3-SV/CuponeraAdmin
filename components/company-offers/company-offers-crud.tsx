@@ -1573,7 +1573,7 @@ export function CompanyOffersCrud({
 
                         <label
                           htmlFor={`offer-image-${image.key}`}
-                          className="group relative block cursor-pointer overflow-hidden rounded-lg border border-[var(--border)]"
+                          className="group relative block h-40 cursor-pointer overflow-hidden rounded-lg border border-[var(--border)]"
                         >
                           {image.previewUrl || image.image_url ? (
                             <>
@@ -1582,10 +1582,10 @@ export function CompanyOffersCrud({
                                 alt={
                                   image.image_alt_text || "Vista previa de oferta"
                                 }
-                                width={320}
-                                height={160}
+                                fill
+                                sizes="(max-width: 768px) 100vw, 50vw"
                                 unoptimized
-                                className="h-40 w-full object-cover"
+                                className="object-cover"
                               />
                               <span className="absolute inset-0 grid place-items-center bg-black/55 text-white opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
                                 <EditImageIcon />
@@ -1782,14 +1782,16 @@ export function CompanyOffersCrud({
                           key={image.offer_carousel_image_id}
                           className="space-y-2 rounded-lg border border-[var(--border)] p-2"
                         >
-                          <Image
-                            src={image.image_url}
-                            alt={image.image_alt_text || "Imagen de oferta"}
-                            width={360}
-                            height={180}
-                            unoptimized
-                            className="h-44 w-full rounded-md object-cover"
-                          />
+                          <div className="relative h-44 w-full overflow-hidden rounded-md">
+                            <Image
+                              src={image.image_url}
+                              alt={image.image_alt_text || "Imagen de oferta"}
+                              fill
+                              sizes="(max-width: 768px) 100vw, 50vw"
+                              unoptimized
+                              className="object-cover"
+                            />
+                          </div>
                           <p className="text-xs text-[var(--text-muted)]">
                             {image.main_image ? "Imagen principal" : "Imagen"}
                           </p>
