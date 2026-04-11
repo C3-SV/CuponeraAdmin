@@ -158,6 +158,10 @@ export async function listOffers(
         { count: "exact" },
       );
 
+    if (params.state === "ALL") {
+      query = query.neq("offer_status", "DISCARDED");
+    }
+
     if (params.state === "DISCARDED") {
       query = query.eq("offer_status", "DISCARDED");
     }
@@ -329,14 +333,16 @@ export async function rejectOffer(
 
 export async function discardOffer(offerId: string): Promise<OfferActionResult> {
   try {
-    await requireCouponeraAdmin();
-
+    const reviewerId = await requireCouponeraAdmin();
     const now = new Date().toISOString();
     const supabase = await createClient();
+
     const { error } = await supabase
       .from("offers")
       .update({
         offer_status: "DISCARDED",
+        reviewed_by: reviewerId,
+        reviewed_at: now,
         updated_at: now,
       })
       .eq("offer_id", offerId)

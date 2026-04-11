@@ -1,4 +1,4 @@
-export type OfferStatus = "PENDING" | "APPROVED" | "REJECTED";
+export type OfferStatus = "PENDING" | "APPROVED" | "REJECTED" | "DISCARDED";
 export type OfferStateFilter =
   | "ALL"
   | "PENDING"
