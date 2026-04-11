@@ -9,7 +9,6 @@ import type {
   OfferDetail,
   OfferImage,
   OfferListItem,
-  OfferOrderDetail,
   OfferQueryParams,
   OffersListResponse,
   OfferListDetail,
@@ -54,30 +53,6 @@ type OfferListDetailRow = {
   item_title: string;
   item_description: string;
   item_sort_order: number;
-};
-
-type OfferOrderRelation =
-  | {
-      order_id: string;
-      order_payment_ref: string | null;
-      order_paid_at: string | null;
-      order_status: string;
-    }
-  | {
-      order_id: string;
-      order_payment_ref: string | null;
-      order_paid_at: string | null;
-      order_status: string;
-    }[]
-  | null;
-
-type OfferOrderItemRow = {
-  order_item_id: string;
-  order_id: string | null;
-  quantity: number | string;
-  unit_price: number | string;
-  created_at: string;
-  orders: OfferOrderRelation;
 };
 
 type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
@@ -199,32 +174,6 @@ function toOfferListDetail(row: OfferListDetailRow): OfferListDetail {
     item_title: row.item_title,
     item_description: row.item_description,
     item_sort_order: Number(row.item_sort_order),
-  };
-}
-
-function getOrderRelation(row: OfferOrderItemRow) {
-  if (!row.orders) {
-    return null;
-  }
-
-  return Array.isArray(row.orders) ? row.orders[0] ?? null : row.orders;
-}
-
-function toOfferOrderDetail(row: OfferOrderItemRow): OfferOrderDetail {
-  const order = getOrderRelation(row);
-  const quantity = Number(row.quantity);
-  const unitPrice = Number(row.unit_price);
-
-  return {
-    order_item_id: row.order_item_id,
-    order_id: order?.order_id ?? row.order_id,
-    order_status: order?.order_status ?? "Sin estado",
-    order_paid_at: order?.order_paid_at ?? null,
-    order_payment_ref: order?.order_payment_ref ?? null,
-    quantity,
-    unit_price: unitPrice,
-    subtotal: quantity * unitPrice,
-    created_at: row.created_at,
   };
 }
 
@@ -383,8 +332,7 @@ export async function getOfferDetail(
       };
     }
 
-    const [imagesResult, listDetailsResult, orderDetailsResult] =
-      await Promise.all([
+    const [imagesResult, listDetailsResult] = await Promise.all([
         supabase
           .from("offer_carousel_images")
           .select(
@@ -402,14 +350,6 @@ export async function getOfferDetail(
           .eq("offer_id", offerId)
           .is("deleted_at", null)
           .order("item_sort_order", { ascending: true }),
-        supabase
-          .from("order_items")
-          .select(
-            "order_item_id, order_id, quantity, unit_price, created_at, orders(order_id, order_payment_ref, order_paid_at, order_status)",
-          )
-          .eq("offer_id", offerId)
-          .is("deleted_at", null)
-          .order("created_at", { ascending: false }),
       ]);
 
     const detail: OfferDetail = {
@@ -423,11 +363,6 @@ export async function getOfferDetail(
         ? []
         : ((listDetailsResult.data ?? []) as OfferListDetailRow[]).map(
             toOfferListDetail,
-          ),
-      order_details: orderDetailsResult.error
-        ? []
-        : ((orderDetailsResult.data ?? []) as OfferOrderItemRow[]).map(
-            toOfferOrderDetail,
           ),
     };
 
