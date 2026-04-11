@@ -295,8 +295,19 @@ export async function createCompanyEmployee(
         user_metadata: {
           first_names: normalized.first_names,
           last_names: normalized.last_names,
+          // Compatibilidad con triggers legacy que esperan singular.
+          first_name: normalized.first_names,
+          last_name: normalized.last_names,
           user_role: "EMPLOYEE",
           company_id: context.companyId,
+        },
+        app_metadata: {
+          user_role: "EMPLOYEE",
+          company_id: context.companyId,
+          first_names: normalized.first_names,
+          last_names: normalized.last_names,
+          first_name: normalized.first_names,
+          last_name: normalized.last_names,
         },
       });
 
@@ -307,14 +318,19 @@ export async function createCompanyEmployee(
       };
     }
 
-    const { error: profileError } = await supabaseAdmin.from("profiles").insert({
-      user_id: authData.user.id,
-      first_names: normalized.first_names,
-      last_names: normalized.last_names,
-      user_role: "EMPLOYEE",
-      user_is_active: normalized.user_is_active,
-      company_id: context.companyId,
-    });
+    const { error: profileError } = await supabaseAdmin.from("profiles").upsert(
+      {
+        user_id: authData.user.id,
+        first_names: normalized.first_names,
+        last_names: normalized.last_names,
+        user_role: "EMPLOYEE",
+        user_is_active: normalized.user_is_active,
+        company_id: context.companyId,
+        deleted_at: null,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "user_id" },
+    );
 
     if (profileError) {
       await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
@@ -440,6 +456,13 @@ export async function updateCompanyEmployee(
 export async function softDeleteCompanyEmployee(
   userId: string,
 ): Promise<EmployeeActionResult> {
+  return setCompanyEmployeeActiveStatus(userId, false);
+}
+
+export async function setCompanyEmployeeActiveStatus(
+  userId: string,
+  isActive: boolean,
+): Promise<EmployeeActionResult> {
   try {
     const context = await getCompanyIdFromSession();
 
@@ -448,12 +471,12 @@ export async function softDeleteCompanyEmployee(
     }
 
     const supabaseAdmin = createAdminClient();
+    const now = new Date().toISOString();
     const { error } = await supabaseAdmin
       .from("profiles")
       .update({
-        user_is_active: false,
-        deleted_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
+        user_is_active: isActive,
+        updated_at: now,
       })
       .eq("user_id", userId)
       .eq("company_id", context.companyId)
@@ -471,7 +494,9 @@ export async function softDeleteCompanyEmployee(
 
     return {
       ok: true,
-      message: "Empleado desactivado correctamente.",
+      message: isActive
+        ? "Empleado activado correctamente."
+        : "Empleado desactivado correctamente.",
     };
   } catch (error) {
     return {
@@ -479,7 +504,9 @@ export async function softDeleteCompanyEmployee(
       message:
         error instanceof Error
           ? error.message
-          : "No fue posible desactivar el empleado.",
+          : isActive
+            ? "No fue posible activar el empleado."
+            : "No fue posible desactivar el empleado.",
     };
   }
 }

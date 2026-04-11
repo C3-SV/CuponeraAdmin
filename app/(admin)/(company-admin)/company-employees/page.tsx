@@ -1,6 +1,9 @@
 import { CompanyEmployeesCrud } from "@/components/company-employees/company-employees-crud";
 import { listCompanyEmployees } from "./actions";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export default async function CompanyEmployeesPage() {
   const initialList = await listCompanyEmployees({
     search: "",

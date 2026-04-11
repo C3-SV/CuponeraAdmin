@@ -13,7 +13,7 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "La Cuponera Admin",
+  title: "Mundo Cupones - Admin Dashboard",
   description: "Base del dashboard administrativo de La Cuponera.",
 };
 

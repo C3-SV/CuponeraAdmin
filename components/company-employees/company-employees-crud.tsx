@@ -6,6 +6,7 @@ import {
   createCompanyEmployee,
   getCompanyEmployeeDetail,
   listCompanyEmployees,
+  setCompanyEmployeeActiveStatus,
   softDeleteCompanyEmployee,
   updateCompanyEmployee,
 } from "@/app/(admin)/(company-admin)/company-employees/actions";
@@ -67,6 +68,109 @@ function ActiveBadge({ active }: { active: boolean }) {
     >
       {active ? "Activo" : "Inactivo"}
     </span>
+  );
+}
+
+function PlusIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 20 20"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      className="h-3.5 w-3.5"
+    >
+      <path d="M10 4v12" />
+      <path d="M4 10h12" />
+    </svg>
+  );
+}
+
+function DetailIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 20 20"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      className="h-3.5 w-3.5"
+    >
+      <circle cx="10" cy="10" r="7" />
+      <line x1="10" y1="8.3" x2="10" y2="13.4" />
+      <circle cx="10" cy="5.8" r="0.9" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+function EditIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 20 20"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      className="h-3.5 w-3.5"
+    >
+      <path d="M13.9 3.6a2 2 0 0 1 2.8 2.8l-8.4 8.4-3.4.6.6-3.4 8.4-8.4Z" />
+      <path d="m12.5 5 2.5 2.5" />
+    </svg>
+  );
+}
+
+function DeactivateIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 20 20"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="h-3.5 w-3.5"
+    >
+      <circle cx="10" cy="10" r="7" />
+      <path d="m5.2 5.2 9.6 9.6" />
+    </svg>
+  );
+}
+
+function ActivateIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 20 20"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="h-3.5 w-3.5"
+    >
+      <circle cx="10" cy="10" r="7" />
+      <path d="m6.7 10.2 2.1 2.1 4.8-5" />
+    </svg>
+  );
+}
+
+function CloseIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 20 20"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      className="h-4 w-4"
+    >
+      <path d="m5 5 10 10" />
+      <path d="M15 5 5 15" />
+    </svg>
   );
 }
 
@@ -302,14 +406,15 @@ export function CompanyEmployeesCrud({ initialList }: CompanyEmployeesCrudProps)
   }
 
   async function handleDeleteEmployee(employee: EmployeeListItem) {
+    const nextStatus = !employee.user_is_active;
     const confirmation = await Swal.fire({
       icon: "warning",
-      title: "Desactivar empleado",
-      text: `Esta accion desactivara a ${employee.first_names} ${employee.last_names}.`,
+      title: nextStatus ? "Activar empleado" : "Desactivar empleado",
+      text: `Esta acción ${nextStatus ? "activará" : "desactivará"} a ${employee.first_names} ${employee.last_names}.`,
       showCancelButton: true,
-      confirmButtonText: "Si, desactivar",
+      confirmButtonText: nextStatus ? "Sí, activar" : "Sí, desactivar",
       cancelButtonText: "Cancelar",
-      confirmButtonColor: "#e26721",
+      confirmButtonColor: nextStatus ? "#16a34a" : "#e26721",
       cancelButtonColor: "#0f3d78",
     });
 
@@ -317,12 +422,14 @@ export function CompanyEmployeesCrud({ initialList }: CompanyEmployeesCrudProps)
       return;
     }
 
-    const result = await softDeleteCompanyEmployee(employee.user_id);
+    const result = employee.user_is_active
+      ? await softDeleteCompanyEmployee(employee.user_id)
+      : await setCompanyEmployeeActiveStatus(employee.user_id, true);
 
     if (!result.ok) {
       await Swal.fire({
         icon: "error",
-        title: "No se pudo desactivar",
+        title: nextStatus ? "No se pudo activar" : "No se pudo desactivar",
         text: result.message,
         confirmButtonColor: "#0f3d78",
       });
@@ -337,7 +444,7 @@ export function CompanyEmployeesCrud({ initialList }: CompanyEmployeesCrudProps)
 
     await Swal.fire({
       icon: "success",
-      title: "Empleado desactivado",
+      title: nextStatus ? "Empleado activado" : "Empleado desactivado",
       text: result.message,
       confirmButtonColor: "#0f3d78",
     });
@@ -404,8 +511,9 @@ export function CompanyEmployeesCrud({ initialList }: CompanyEmployeesCrudProps)
           <button
             type="button"
             onClick={openCreateModal}
-            className="h-10 rounded-xl bg-[var(--brand-blue)] px-4 text-sm font-medium text-white hover:bg-[var(--accent-strong)]"
+            className="inline-flex h-10 items-center gap-2 rounded-xl bg-[var(--brand-blue)] px-4 text-sm font-medium text-white hover:bg-[var(--accent-strong)]"
           >
+            <PlusIcon />
             Crear empleado
           </button>
 
@@ -520,23 +628,34 @@ export function CompanyEmployeesCrud({ initialList }: CompanyEmployeesCrudProps)
                           <button
                             type="button"
                             onClick={() => void openDetailModal(employee.user_id)}
-                            className="rounded-lg border border-[var(--border)] px-3 py-1.5 text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--surface-soft)]"
+                            className="inline-flex items-center gap-1 rounded-lg border border-[var(--border)] px-3 py-1.5 text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--surface-soft)]"
                           >
+                            <DetailIcon />
                             Detalle
                           </button>
                           <button
                             type="button"
                             onClick={() => openEditModal(employee)}
-                            className="rounded-lg bg-[var(--brand-blue)] px-3 py-1.5 text-xs font-medium text-white hover:bg-[var(--accent-strong)]"
+                            className="inline-flex items-center gap-1 rounded-lg bg-[var(--brand-blue)] px-3 py-1.5 text-xs font-medium text-white hover:bg-[var(--accent-strong)]"
                           >
+                            <EditIcon />
                             Editar
                           </button>
                           <button
                             type="button"
                             onClick={() => void handleDeleteEmployee(employee)}
-                            className="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700"
+                            className={`inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-medium text-white ${
+                              employee.user_is_active
+                                ? "bg-red-600 hover:bg-red-700"
+                                : "bg-green-600 hover:bg-green-700"
+                            }`}
                           >
-                            Desactivar
+                            {employee.user_is_active ? (
+                              <DeactivateIcon />
+                            ) : (
+                              <ActivateIcon />
+                            )}
+                            {employee.user_is_active ? "Desactivar" : "Activar"}
                           </button>
                         </div>
                       </td>
@@ -600,9 +719,10 @@ export function CompanyEmployeesCrud({ initialList }: CompanyEmployeesCrudProps)
               <button
                 type="button"
                 onClick={closeFormModal}
-                className="rounded-lg border border-[var(--border)] px-2.5 py-1.5 text-sm text-[var(--text-muted)] hover:bg-[var(--surface-soft)]"
+                aria-label="Cerrar modal de formulario"
+                className="inline-flex size-9 items-center justify-center rounded-lg border border-[var(--border)] text-[var(--text-muted)] hover:bg-[var(--surface-soft)]"
               >
-                Cerrar
+                <CloseIcon />
               </button>
             </header>
 
@@ -737,9 +857,10 @@ export function CompanyEmployeesCrud({ initialList }: CompanyEmployeesCrudProps)
               <button
                 type="button"
                 onClick={closeDetailModal}
-                className="rounded-lg border border-[var(--border)] px-2.5 py-1.5 text-sm text-[var(--text-muted)] hover:bg-[var(--surface-soft)]"
+                aria-label="Cerrar modal de detalle"
+                className="inline-flex size-9 items-center justify-center rounded-lg border border-[var(--border)] text-[var(--text-muted)] hover:bg-[var(--surface-soft)]"
               >
-                Cerrar
+                <CloseIcon />
               </button>
             </header>
 
