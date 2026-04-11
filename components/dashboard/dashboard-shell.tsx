@@ -10,6 +10,7 @@ type DashboardShellProps = {
   children: React.ReactNode;
 };
 
+// Determina estado activo considerando rutas hijas de cada modulo.
 function isPathActive(currentPath: string, href: string): boolean {
   if (href === "/dashboard") {
     return currentPath === href;
@@ -22,6 +23,7 @@ export function DashboardShell({ children }: DashboardShellProps) {
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
+  // Deriva secciones visibles segun permisos (placeholder mientras auth llega).
   const sections = useMemo(() => {
     // TODO: conectar rol real desde Supabase cuando auth/permisos este listo.
     return getVisibleSections(null);
@@ -30,6 +32,7 @@ export function DashboardShell({ children }: DashboardShellProps) {
   return (
     <div className="min-h-screen p-3 sm:p-5">
       <div className="mx-auto grid min-h-[calc(100vh-1.5rem)] max-w-[1500px] rounded-3xl border border-[var(--border)] bg-[var(--surface)] shadow-[0_10px_26px_-20px_rgba(8,34,66,0.28)] lg:grid-cols-[300px_minmax(0,1fr)]">
+        {/* Sidebar principal de navegacion */}
         <aside
           className={`fixed inset-y-3 left-3 z-30 w-[300px] rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5 transition-transform duration-300 ease-out lg:static lg:inset-auto lg:w-auto lg:rounded-none lg:border-0 lg:border-r lg:transition-none ${
             mobileMenuOpen ? "translate-x-0" : "-translate-x-[110%] lg:translate-x-0"
@@ -68,6 +71,7 @@ export function DashboardShell({ children }: DashboardShellProps) {
             </div>
           </div>
 
+          {/* Menu agrupado por secciones funcionales */}
           <nav className="mt-6 space-y-6 overflow-y-auto pb-4">
             {sections.map((section) => (
               <div key={section.title} className="space-y-2">
@@ -122,6 +126,7 @@ export function DashboardShell({ children }: DashboardShellProps) {
           </nav>
         </aside>
 
+        {/* Contenedor del contenido del modulo activo */}
         <div className="min-w-0 rounded-3xl bg-[var(--surface-soft)] p-4 sm:p-6 lg:rounded-l-none lg:p-7">
           <header className="mb-6 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[0_8px_18px_-14px_rgba(15,23,42,0.26)]">
             <div className="flex flex-wrap items-center gap-3">
@@ -168,6 +173,7 @@ export function DashboardShell({ children }: DashboardShellProps) {
         </div>
       </div>
 
+      {/* Overlay para cerrar menu movil al tocar fuera del aside */}
       {mobileMenuOpen ? (
         <button
           type="button"
