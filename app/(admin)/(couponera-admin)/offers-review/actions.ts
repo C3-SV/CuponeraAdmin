@@ -159,9 +159,7 @@ export async function listOffers(
       );
 
     if (params.state === "DISCARDED") {
-      query = query.not("deleted_at", "is", null);
-    } else {
-      query = query.is("deleted_at", null);
+      query = query.eq("offer_status", "DISCARDED");
     }
 
     if (params.state === "PENDING") {
@@ -338,7 +336,7 @@ export async function discardOffer(offerId: string): Promise<OfferActionResult> 
     const { error } = await supabase
       .from("offers")
       .update({
-        deleted_at: now,
+        offer_status: "DISCARDED",
         updated_at: now,
       })
       .eq("offer_id", offerId)
