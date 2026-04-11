@@ -74,6 +74,67 @@ type CouponRow = {
   deleted_at: string | null;
 };
 
+function EyeIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      className="h-4 w-4"
+      viewBox="0 0 20 20"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path
+        d="M1.667 10s3.03-5 8.333-5c5.304 0 8.333 5 8.333 5s-3.03 5-8.333 5c-5.304 0-8.333-5-8.333-5Z"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <circle cx="10" cy="10" r="2.5" stroke="currentColor" strokeWidth="1.5" />
+    </svg>
+  );
+}
+
+function TicketIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      className="h-4 w-4"
+      viewBox="0 0 20 20"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path
+        d="M3.333 5.833a1.667 1.667 0 0 1 1.667-1.666h10a1.667 1.667 0 0 1 1.667 1.666v2.084a1.667 1.667 0 0 0 0 3.166v2.084A1.667 1.667 0 0 1 15 14.833H5a1.667 1.667 0 0 1-1.667-1.666v-2.084a1.667 1.667 0 0 0 0-3.166V5.833Z"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path d="M7.5 6.667v6.666" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function CloseIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      className="h-4 w-4"
+      viewBox="0 0 20 20"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path
+        d="M5.833 5.833 14.167 14.167M14.167 5.833 5.833 14.167"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
 function getStatusStyles(status: CustomerStatus): string {
   if (status === "activa") {
     return "bg-green-100 text-green-700";
@@ -564,7 +625,6 @@ export default function CustomersPage() {
                     <p className="text-sm font-medium text-foreground">
                       {customer.nombreCompleto}
                     </p>
-                    <p className="text-xs text-(--text-muted)">{customer.id}</p>
                   </td>
                   <td className="px-4 py-3">
                     <p className="text-xs text-(--text-muted)">{customer.telefono}</p>
@@ -586,15 +646,17 @@ export default function CustomersPage() {
                       <button
                         type="button"
                         onClick={() => openCustomerDetail(customer)}
-                        className="rounded-lg border border-(--border) px-3 py-1.5 text-xs font-medium text-foreground hover:bg-(--surface-soft)"
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-(--border) px-3 py-1.5 text-xs font-medium text-foreground hover:bg-(--surface-soft)"
                       >
+                        <EyeIcon />
                         Ver detalle
                       </button>
                       <button
                         type="button"
                         onClick={() => openCustomerCoupons(customer)}
-                        className="rounded-lg bg-(--brand-blue) px-3 py-1.5 text-xs font-medium text-white hover:bg-(--accent-strong)"
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-(--brand-blue) px-3 py-1.5 text-xs font-medium text-white hover:bg-(--accent-strong)"
                       >
+                        <TicketIcon />
                         Ver cupones
                       </button>
                     </div>
@@ -652,16 +714,15 @@ export default function CustomersPage() {
                 <h2 className="text-xl font-semibold text-foreground">
                   Detalle de cliente
                 </h2>
-                <p className="text-sm text-(--text-muted)">
-                  {selectedCustomer.nombreCompleto} · {selectedCustomer.id}
-                </p>
+                <p className="text-sm text-(--text-muted)">{selectedCustomer.nombreCompleto}</p>
               </div>
               <button
                 type="button"
                 onClick={closeDetailModal}
-                className="rounded-lg border border-(--border) px-2.5 py-1.5 text-sm text-(--text-muted) hover:bg-(--surface-soft)"
+                aria-label="Cerrar detalle"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-(--border) text-(--text-muted) hover:bg-(--surface-soft)"
               >
-                Cerrar
+                <CloseIcon />
               </button>
             </header>
 
@@ -737,9 +798,7 @@ export default function CustomersPage() {
                 <h2 className="text-xl font-semibold text-foreground">
                   Cupones por estado
                 </h2>
-                <p className="text-sm text-(--text-muted)">
-                  {selectedCustomer.nombreCompleto} · {selectedCustomer.id}
-                </p>
+                <p className="text-sm text-(--text-muted)">{selectedCustomer.nombreCompleto}</p>
               </div>
               <div className="flex gap-2">
                 <button
@@ -752,9 +811,10 @@ export default function CustomersPage() {
                 <button
                   type="button"
                   onClick={closeCouponModal}
-                  className="rounded-lg border border-(--border) px-2.5 py-1.5 text-sm text-(--text-muted) hover:bg-(--surface-soft)"
+                  aria-label="Cerrar cupones"
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-(--border) text-(--text-muted) hover:bg-(--surface-soft)"
                 >
-                  Cerrar
+                  <CloseIcon />
                 </button>
               </div>
             </header>
