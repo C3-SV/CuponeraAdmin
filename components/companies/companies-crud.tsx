@@ -131,6 +131,22 @@ function DeleteIcon() {
   );
 }
 
+// Icono de cierre de modales con estilo consistente con ofertas.
+function CloseIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 20 20"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.9"
+      className="h-4 w-4"
+    >
+      <path d="m5.5 5.5 9 9M14.5 5.5l-9 9" />
+    </svg>
+  );
+}
+
 // Convierte un archivo local a dataURL para enviarlo a Server Actions.
 function toImagePayload(file: File): Promise<CompanyImagePayload> {
   return new Promise((resolve, reject) => {
@@ -478,7 +494,7 @@ export function CompaniesCrud({
     if (!result.ok) {
       await Swal.fire({
         icon: "error",
-        title: "Operacion fallida",
+        title: "Operación fallida",
         text: result.message,
         confirmButtonColor: "#0f3d78",
       });
@@ -536,7 +552,7 @@ export function CompaniesCrud({
             }
             className="h-10 rounded-xl border border-[var(--border)] bg-white px-3 text-sm text-[var(--text-primary)] outline-none"
           >
-            <option value="">Todas las categorias</option>
+            <option value="">Todos los rubros</option>
             {initialCategories.map((category) => (
               <option key={category.category_id} value={category.category_id}>
                 {category.category_name}
@@ -813,9 +829,10 @@ export function CompaniesCrud({
               <button
                 type="button"
                 onClick={closeFormModal}
-                className="rounded-lg border border-[var(--border)] px-2.5 py-1.5 text-sm text-[var(--text-muted)] hover:bg-[var(--surface-soft)]"
+                aria-label="Cerrar modal de formulario"
+                className="inline-flex size-9 items-center justify-center rounded-lg border border-[var(--border)] text-[var(--text-muted)] hover:bg-[var(--surface-soft)]"
               >
-                Cerrar
+                <CloseIcon />
               </button>
             </header>
 
@@ -1012,9 +1029,10 @@ export function CompaniesCrud({
               <button
                 type="button"
                 onClick={closeDetailModal}
-                className="rounded-lg border border-[var(--border)] px-2.5 py-1.5 text-sm text-[var(--text-muted)] hover:bg-[var(--surface-soft)]"
+                aria-label="Cerrar modal de detalle"
+                className="inline-flex size-9 items-center justify-center rounded-lg border border-[var(--border)] text-[var(--text-muted)] hover:bg-[var(--surface-soft)]"
               >
-                Cerrar
+                <CloseIcon />
               </button>
             </header>
 

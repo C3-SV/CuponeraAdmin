@@ -32,11 +32,12 @@ type AdminFormValues = {
   first_names: string;
   last_names: string;
   email: string;
+  phone: string;
   password: string;
   user_is_active: boolean;
 };
 type AdminFormErrors = Partial<
-  Record<"first_names" | "last_names" | "email" | "password", string>
+  Record<"first_names" | "last_names" | "email" | "phone" | "password", string>
 >;
 
 const DEFAULT_QUERY: CompanyAdminAssignmentQueryParams = {
@@ -51,6 +52,7 @@ const EMPTY_FORM: AdminFormValues = {
   first_names: "",
   last_names: "",
   email: "",
+  phone: "",
   password: "",
   user_is_active: true,
 };
@@ -134,6 +136,56 @@ function DeleteIcon() {
       <path d="M5.9 5.8v9.2a1 1 0 0 0 1 1h6.2a1 1 0 0 0 1-1V5.8" />
       <path d="M8.5 8.4v5.1M11.5 8.4v5.1" />
     </svg>
+  );
+}
+
+// Icono estandar de cierre para modales.
+function CloseIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 20 20"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.9"
+      className="h-4 w-4"
+    >
+      <path d="m5.5 5.5 9 9M14.5 5.5l-9 9" />
+    </svg>
+  );
+}
+
+// Toggle reutilizable de estado activo/inactivo.
+function StatusToggle({
+  checked,
+  onChange,
+}: {
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <label className="inline-flex items-center gap-3">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(event) => onChange(event.target.checked)}
+        className="sr-only"
+      />
+      <span
+        className={`relative inline-flex h-6 w-11 rounded-full transition-colors ${
+          checked ? "bg-[var(--brand-blue)]" : "bg-slate-300"
+        }`}
+      >
+        <span
+          className={`absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${
+            checked ? "translate-x-5" : ""
+          }`}
+        />
+      </span>
+      <span className="text-sm font-medium text-[var(--text-primary)]">
+        {checked ? "Activo" : "Inactivo"}
+      </span>
+    </label>
   );
 }
 
@@ -283,7 +335,7 @@ export function CompanyAdminAssignmentCrud({
     if (!detailResult.ok || !detailResult.data?.assigned_admin) {
       await Swal.fire({
         icon: "error",
-        title: "No se pudo cargar el administrador",
+        title: "No se pudo cargar el contacto",
         text: detailResult.message,
         confirmButtonColor: "#0f3d78",
       });
@@ -296,6 +348,7 @@ export function CompanyAdminAssignmentCrud({
       first_names: detailResult.data.assigned_admin.first_names,
       last_names: detailResult.data.assigned_admin.last_names,
       email: detailResult.data.assigned_admin.email ?? "",
+      phone: detailResult.data.assigned_admin.phone ?? "",
       password: "",
       user_is_active: detailResult.data.assigned_admin.user_is_active,
     });
@@ -368,6 +421,7 @@ export function CompanyAdminAssignmentCrud({
         first_names: formValues.first_names,
         last_names: formValues.last_names,
         email: formValues.email,
+        phone: formValues.phone,
         password: formValues.password,
         user_is_active: formValues.user_is_active,
       });
@@ -391,7 +445,7 @@ export function CompanyAdminAssignmentCrud({
       if (!result.ok) {
         await Swal.fire({
           icon: "error",
-          title: "Operacion fallida",
+          title: "Operación fallida",
           text: result.message,
           confirmButtonColor: "#0f3d78",
         });
@@ -404,7 +458,7 @@ export function CompanyAdminAssignmentCrud({
 
       await Swal.fire({
         icon: "success",
-        title: "Administrador asignado",
+        title: "Contacto asignado",
         text: result.message,
         confirmButtonColor: "#0f3d78",
       });
@@ -415,6 +469,7 @@ export function CompanyAdminAssignmentCrud({
       first_names: formValues.first_names,
       last_names: formValues.last_names,
       email: formValues.email,
+      phone: formValues.phone,
       user_is_active: formValues.user_is_active,
     });
     const validation = validateCompanyAdminUpdateInput(normalized);
@@ -437,7 +492,7 @@ export function CompanyAdminAssignmentCrud({
       await Swal.fire({
         icon: "error",
         title: "Error",
-        text: "No se encontro administrador para editar.",
+        text: "No se encontró contacto para editar.",
         confirmButtonColor: "#0f3d78",
       });
       return;
@@ -453,7 +508,7 @@ export function CompanyAdminAssignmentCrud({
     if (!result.ok) {
       await Swal.fire({
         icon: "error",
-        title: "Operacion fallida",
+        title: "Operación fallida",
         text: result.message,
         confirmButtonColor: "#0f3d78",
       });
@@ -466,7 +521,7 @@ export function CompanyAdminAssignmentCrud({
 
     await Swal.fire({
       icon: "success",
-      title: "Administrador actualizado",
+      title: "Contacto actualizado",
       text: result.message,
       confirmButtonColor: "#0f3d78",
     });
@@ -481,10 +536,10 @@ export function CompanyAdminAssignmentCrud({
 
     const confirmation = await Swal.fire({
       icon: "warning",
-      title: "Quitar administrador",
-      text: `Se desasignara al administrador de ${company.company_name} y su cuenta quedara inactiva.`,
+      title: "Quitar contacto",
+      text: `Se desasignará al contacto de ${company.company_name} y su cuenta quedará inactiva.`,
       showCancelButton: true,
-      confirmButtonText: "Si, desasignar",
+      confirmButtonText: "Sí, desasignar",
       cancelButtonText: "Cancelar",
       confirmButtonColor: "#dc2626",
       cancelButtonColor: "#0f3d78",
@@ -498,7 +553,7 @@ export function CompanyAdminAssignmentCrud({
     if (!result.ok) {
       await Swal.fire({
         icon: "error",
-        title: "Operacion fallida",
+        title: "Operación fallida",
         text: result.message,
         confirmButtonColor: "#0f3d78",
       });
@@ -508,7 +563,7 @@ export function CompanyAdminAssignmentCrud({
     await loadAssignments(queryRef.current);
     await Swal.fire({
       icon: "success",
-      title: "Administrador desasignado",
+      title: "Contacto desasignado",
       text: result.message,
       confirmButtonColor: "#0f3d78",
     });
@@ -520,10 +575,10 @@ export function CompanyAdminAssignmentCrud({
       <section className="space-y-5 rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[0_6px_14px_-12px_rgba(15,23,42,0.24)] lg:p-7">
         <div className="space-y-1">
           <h1 className="text-2xl font-semibold tracking-tight text-[var(--text-primary)]">
-            Asignacion de Admin de Empresa
+            Asignación de Contactos de Empresa
           </h1>
           <p className="text-sm text-[var(--text-muted)]">
-            Vincula y administra perfiles ADMIN_COMPANY por empresa.
+            Vincula y administra los contactos responsables por empresa.
           </p>
         </div>
 
@@ -594,7 +649,7 @@ export function CompanyAdminAssignmentCrud({
                 </th>
                 <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">
                   <div className="inline-flex items-center gap-1 whitespace-nowrap">
-                    <span>Administrador asignado</span>
+                    <span>Contacto asignado</span>
                     <button
                       type="button"
                       onClick={() => void handleSort("assigned_admin")}
@@ -648,7 +703,7 @@ export function CompanyAdminAssignmentCrud({
                             {!row.assigned_admin.user_is_active ? "(Inactivo)" : ""}
                           </span>
                         ) : (
-                          <span className="text-[var(--text-muted)]">Sin asignar</span>
+                          <span className="text-[var(--text-muted)]">Sin contacto</span>
                         )}
                       </td>
                       <td className="px-4 py-3">
@@ -669,7 +724,7 @@ export function CompanyAdminAssignmentCrud({
                                 className="inline-flex items-center gap-1 rounded-lg bg-[var(--brand-blue)] px-3 py-1.5 text-xs font-medium text-white hover:bg-[var(--accent-strong)]"
                               >
                                 <EditIcon />
-                                Editar admin
+                                Editar contacto
                               </button>
                               <button
                                 type="button"
@@ -687,7 +742,7 @@ export function CompanyAdminAssignmentCrud({
                               className="inline-flex items-center gap-1 rounded-lg bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700"
                             >
                               <UserIcon />
-                              Asignar admin
+                              Asignar contacto
                             </button>
                           )}
                         </div>
@@ -732,7 +787,7 @@ export function CompanyAdminAssignmentCrud({
         </div>
       </section>
 
-      {/** Modal de crear/editar administrador de empresa. */}
+      {/** Modal de crear/editar contacto de empresa. */}
       {isFormModalOpen ? (
         <div className="fixed inset-0 z-40 grid place-items-center p-4">
           <button
@@ -746,8 +801,8 @@ export function CompanyAdminAssignmentCrud({
               <div>
                 <h2 className="text-xl font-semibold text-[var(--text-primary)]">
                   {formMode === "create"
-                    ? "Asignar Admin de Empresa"
-                    : "Editar Admin de Empresa"}
+                    ? "Asignar contacto de empresa"
+                    : "Editar contacto de empresa"}
                 </h2>
                 <p className="text-sm text-[var(--text-muted)]">
                   Empresa: {selectedCompany?.company_name}
@@ -756,9 +811,10 @@ export function CompanyAdminAssignmentCrud({
               <button
                 type="button"
                 onClick={closeFormModal}
-                className="rounded-lg border border-[var(--border)] px-2.5 py-1.5 text-sm text-[var(--text-muted)] hover:bg-[var(--surface-soft)]"
+                aria-label="Cerrar modal de formulario"
+                className="inline-flex size-9 items-center justify-center rounded-lg border border-[var(--border)] text-[var(--text-muted)] hover:bg-[var(--surface-soft)]"
               >
-                Cerrar
+                <CloseIcon />
               </button>
             </header>
 
@@ -782,9 +838,9 @@ export function CompanyAdminAssignmentCrud({
                 </label>
 
                 <label className="space-y-1">
-                                <span className="text-xs font-medium text-[var(--text-muted)]">
-                                  Apellidos
-                                </span>
+                  <span className="text-xs font-medium text-[var(--text-muted)]">
+                    Apellidos
+                  </span>
                   <input
                     type="text"
                     value={formValues.last_names}
@@ -815,10 +871,28 @@ export function CompanyAdminAssignmentCrud({
                   ) : null}
                 </label>
 
+                <label className="space-y-1">
+                  <span className="text-xs font-medium text-[var(--text-muted)]">
+                    Teléfono
+                  </span>
+                  <input
+                    type="tel"
+                    value={formValues.phone}
+                    onChange={(event) =>
+                      handleFormValueChange("phone", event.target.value)
+                    }
+                    placeholder="+50370000000"
+                    className="h-10 w-full rounded-xl border border-[var(--border)] bg-white px-3 text-sm text-[var(--text-primary)] outline-none"
+                  />
+                  {formErrors.phone ? (
+                    <p className="text-xs text-red-600">{formErrors.phone}</p>
+                  ) : null}
+                </label>
+
                 {formMode === "create" ? (
                   <label className="space-y-1">
                     <span className="text-xs font-medium text-[var(--text-muted)]">
-                      Contrasena
+                      Contraseña
                     </span>
                     <input
                       type="password"
@@ -835,17 +909,17 @@ export function CompanyAdminAssignmentCrud({
                 ) : null}
               </div>
 
-              <label className="inline-flex items-center gap-2 text-sm text-[var(--text-primary)]">
-                <input
-                  type="checkbox"
+              <div className="space-y-2 rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2">
+                <p className="text-xs font-medium text-[var(--text-muted)]">
+                  Estado
+                </p>
+                <StatusToggle
                   checked={formValues.user_is_active}
-                  onChange={(event) =>
-                    handleFormValueChange("user_is_active", event.target.checked)
+                  onChange={(checked) =>
+                    handleFormValueChange("user_is_active", checked)
                   }
-                  className="h-4 w-4 rounded border-[var(--border)]"
                 />
-                Cuenta activa
-              </label>
+              </div>
 
               <footer className="flex justify-end gap-2 pt-2">
                 <button
@@ -872,7 +946,7 @@ export function CompanyAdminAssignmentCrud({
         </div>
       ) : null}
 
-      {/** Modal de detalle para empresa y admin asignado. */}
+      {/** Modal de detalle para empresa y contacto asignado. */}
       {isDetailModalOpen ? (
         <div className="fixed inset-0 z-40 grid place-items-center p-4">
           <button
@@ -885,18 +959,19 @@ export function CompanyAdminAssignmentCrud({
             <header className="mb-4 flex items-start justify-between gap-4 border-b border-[var(--border)] pb-4">
               <div>
                 <h2 className="text-xl font-semibold text-[var(--text-primary)]">
-                  Detalle de asignacion
+                  Detalle de asignación
                 </h2>
                 <p className="text-sm text-[var(--text-muted)]">
-                  Informacion de empresa y administrador asignado.
+                  Información de empresa y contacto asignado.
                 </p>
               </div>
               <button
                 type="button"
                 onClick={closeDetailModal}
-                className="rounded-lg border border-[var(--border)] px-2.5 py-1.5 text-sm text-[var(--text-muted)] hover:bg-[var(--surface-soft)]"
+                aria-label="Cerrar modal de detalle"
+                className="inline-flex size-9 items-center justify-center rounded-lg border border-[var(--border)] text-[var(--text-muted)] hover:bg-[var(--surface-soft)]"
               >
-                Cerrar
+                <CloseIcon />
               </button>
             </header>
 
@@ -908,7 +983,7 @@ export function CompanyAdminAssignmentCrud({
               <div className="space-y-3">
                 <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] p-4">
                   <p className="text-sm text-[var(--text-primary)]">
-                    <span className="font-medium">Codigo:</span> {detailData.company_code}
+                    <span className="font-medium">Código:</span> {detailData.company_code}
                   </p>
                   <p className="mt-2 text-sm text-[var(--text-primary)]">
                     <span className="font-medium">Empresa:</span> {detailData.company_name}
@@ -918,7 +993,7 @@ export function CompanyAdminAssignmentCrud({
                   {detailData.assigned_admin ? (
                     <>
                       <p className="text-sm text-[var(--text-primary)]">
-                        <span className="font-medium">Administrador:</span>{" "}
+                        <span className="font-medium">Contacto:</span>{" "}
                         {detailData.assigned_admin.full_name}
                       </p>
                       <p className="mt-2 text-sm text-[var(--text-primary)]">
@@ -932,17 +1007,21 @@ export function CompanyAdminAssignmentCrud({
                         {detailData.assigned_admin.email ?? "No disponible"}
                       </p>
                       <p className="mt-2 text-sm text-[var(--text-primary)]">
+                        <span className="font-medium">Teléfono:</span>{" "}
+                        {detailData.assigned_admin.phone ?? "No disponible"}
+                      </p>
+                      <p className="mt-2 text-sm text-[var(--text-primary)]">
                         <span className="font-medium">Creado:</span>{" "}
                         {formatDate(detailData.assigned_admin.created_at)}
                       </p>
                       <p className="mt-2 text-sm text-[var(--text-primary)]">
-                        <span className="font-medium">Ultima actualizacion:</span>{" "}
+                        <span className="font-medium">Última actualización:</span>{" "}
                         {formatDate(detailData.assigned_admin.updated_at)}
                       </p>
                     </>
                   ) : (
                     <p className="text-sm text-[var(--text-muted)]">
-                      Esta empresa aun no tiene administrador asignado.
+                      Esta empresa aún no tiene contacto asignado.
                     </p>
                   )}
                 </div>

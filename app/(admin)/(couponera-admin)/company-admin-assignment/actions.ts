@@ -36,6 +36,7 @@ type ProfileRow = {
   first_names: string;
   last_names: string;
   email?: string | null;
+  phone?: string | null;
   user_role: string;
   user_is_active: boolean;
   created_at: string;
@@ -50,6 +51,17 @@ const DEFAULT_QUERY: CompanyAdminAssignmentQueryParams = {
   page: 1,
   pageSize: 10,
 };
+
+type AuthUserContact = {
+  email: string | null;
+  phone: string | null;
+};
+
+// Revalida rutas relacionadas al módulo y al resumen del dashboard.
+function revalidateCompanyAdminAssignmentRoutes() {
+  revalidatePath("/company-admin-assignment");
+  revalidatePath("/dashboard");
+}
 
 // Normaliza query params y aplica limites defensivos.
 function normalizeQueryParams(
@@ -75,6 +87,7 @@ function buildAdminSummary(profile: ProfileRow): AssignedAdminSummary {
     last_names: profile.last_names,
     full_name: `${profile.first_names} ${profile.last_names}`.trim(),
     email: profile.email ?? null,
+    phone: profile.phone ?? null,
     user_is_active: profile.user_is_active,
     created_at: profile.created_at,
     updated_at: profile.updated_at,
@@ -202,28 +215,45 @@ function createSupabaseAdminClient() {
   });
 }
 
-// Obtiene email real desde auth.users (admin client o RPC fallback).
-async function getAuthUserEmailById(userId: string): Promise<string | null> {
+// Obtiene correo y teléfono desde auth.users (con fallback de correo vía RPC).
+async function getAuthUserContactById(userId: string): Promise<AuthUserContact> {
+  const fallback: AuthUserContact = {
+    email: null,
+    phone: null,
+  };
+
   const adminClient = createSupabaseAdminClient();
   if (adminClient) {
     const { data, error } = await adminClient.auth.admin.getUserById(userId);
     if (!error) {
-      return data.user?.email ?? null;
+      const rawMeta = data.user?.user_metadata as
+        | { phone?: unknown }
+        | undefined;
+      return {
+        email: data.user?.email ?? null,
+        phone:
+          typeof rawMeta?.phone === "string" && rawMeta.phone.trim().length > 0
+            ? rawMeta.phone.trim()
+            : data.user?.phone ?? null,
+      };
     }
   }
 
-  // Fallback sin service role: usa funcion SQL SECURITY DEFINER si existe.
+  // Fallback sin service role: usa función SQL SECURITY DEFINER si existe.
   try {
     const supabase = await createClient();
     const { data, error } = await supabase.rpc("get_auth_user_email", {
       target_user_id: userId,
     });
     if (error) {
-      return null;
+      return fallback;
     }
-    return typeof data === "string" ? data : null;
+    return {
+      email: typeof data === "string" ? data : null,
+      phone: null,
+    };
   } catch {
-    return null;
+    return fallback;
   }
 }
 
@@ -318,7 +348,7 @@ export async function listCompanyAdminAssignments(
   }
 }
 
-// Devuelve detalle de una empresa y el admin actual (incluyendo correo).
+// Devuelve detalle de una empresa y el contacto actual (incluyendo correo/teléfono).
 export async function getCompanyAdminDetail(
   companyId: string,
 ): Promise<CompanyAdminActionResult<CompanyAdminDetail>> {
@@ -343,19 +373,20 @@ export async function getCompanyAdminDetail(
       company as CompanyRow,
     );
 
-    let adminWithEmail = assignedAdmin;
+    let adminWithContact = assignedAdmin;
     if (assignedAdmin) {
-      const email = await getAuthUserEmailById(assignedAdmin.user_id);
-      adminWithEmail = {
+      const contact = await getAuthUserContactById(assignedAdmin.user_id);
+      adminWithContact = {
         ...assignedAdmin,
-        email,
+        email: contact.email,
+        phone: contact.phone,
       };
     }
 
     return {
       ok: true,
       message: "Detalle cargado.",
-      data: toAssignmentRow(company as CompanyRow, adminWithEmail),
+      data: toAssignmentRow(company as CompanyRow, adminWithContact),
     };
   } catch (error) {
     return {
@@ -380,7 +411,7 @@ export async function createCompanyAdmin(
     const firstError = Object.values(validation.errors)[0];
     return {
       ok: false,
-      message: firstError ?? "Datos invalidos para crear administrador.",
+      message: firstError ?? "Datos inválidos para crear contacto.",
     };
   }
 
@@ -389,7 +420,7 @@ export async function createCompanyAdmin(
     return {
       ok: false,
       message:
-        "No se encontro SUPABASE_SERVICE_ROLE_KEY. Configura la variable para crear usuarios.",
+        "No se encontró SUPABASE_SERVICE_ROLE_KEY. Configura la variable para crear usuarios.",
     };
   }
 
@@ -417,7 +448,7 @@ export async function createCompanyAdmin(
     if (existingAdmin) {
       return {
         ok: false,
-        message: "Esta empresa ya tiene administrador asignado.",
+        message: "Esta empresa ya tiene un contacto asignado.",
       };
     }
 
@@ -429,6 +460,7 @@ export async function createCompanyAdmin(
         user_metadata: {
           first_names: normalized.first_names,
           last_names: normalized.last_names,
+          phone: normalized.phone,
           // Compatibilidad con triggers legacy que esperan singular.
           first_name: normalized.first_names,
           last_name: normalized.last_names,
@@ -438,6 +470,7 @@ export async function createCompanyAdmin(
           // Compatibilidad con triggers legacy mal implementados.
           first_names: normalized.first_names,
           last_names: normalized.last_names,
+          phone: normalized.phone,
           first_name: normalized.first_names,
           last_name: normalized.last_names,
         },
@@ -486,16 +519,16 @@ export async function createCompanyAdmin(
     if (companyLinkError) {
       return {
         ok: false,
-        message: "Se creo el administrador, pero fallo la vinculacion con la empresa.",
+        message: "Se creó el contacto, pero falló la vinculación con la empresa.",
       };
     }
 
     const detail = await getCompanyAdminDetail(companyId);
-    revalidatePath("/company-admin-assignment");
+    revalidateCompanyAdminAssignmentRoutes();
 
     return {
       ok: true,
-      message: "Administrador de empresa creado correctamente.",
+      message: "Contacto de empresa creado correctamente.",
       data: detail.data,
     };
   } catch (error) {
@@ -504,7 +537,7 @@ export async function createCompanyAdmin(
       message:
         error instanceof Error
           ? error.message
-          : "No fue posible crear el administrador.",
+          : "No fue posible crear el contacto de empresa.",
     };
   }
 }
@@ -522,7 +555,7 @@ export async function updateCompanyAdmin(
     const firstError = Object.values(validation.errors)[0];
     return {
       ok: false,
-      message: firstError ?? "Datos invalidos para actualizar administrador.",
+      message: firstError ?? "Datos inválidos para actualizar contacto.",
     };
   }
 
@@ -533,7 +566,7 @@ export async function updateCompanyAdmin(
       return {
         ok: false,
         message:
-          "No se encontro SUPABASE_SERVICE_ROLE_KEY. Configura la variable para actualizar correos.",
+          "No se encontró SUPABASE_SERVICE_ROLE_KEY. Configura la variable para actualizar correos.",
       };
     }
 
@@ -544,6 +577,7 @@ export async function updateCompanyAdmin(
         user_metadata: {
           first_names: normalized.first_names,
           last_names: normalized.last_names,
+          phone: normalized.phone,
         },
       },
     );
@@ -584,11 +618,11 @@ export async function updateCompanyAdmin(
       .is("deleted_at", null);
 
     const detail = await getCompanyAdminDetail(companyId);
-    revalidatePath("/company-admin-assignment");
+    revalidateCompanyAdminAssignmentRoutes();
 
     return {
       ok: true,
-      message: "Administrador de empresa actualizado correctamente.",
+      message: "Contacto de empresa actualizado correctamente.",
       data: detail.data,
     };
   } catch (error) {
@@ -597,7 +631,7 @@ export async function updateCompanyAdmin(
       message:
         error instanceof Error
           ? error.message
-          : "No fue posible actualizar el administrador.",
+          : "No fue posible actualizar el contacto de empresa.",
     };
   }
 }
@@ -645,11 +679,11 @@ export async function removeCompanyAdmin(
       };
     }
 
-    revalidatePath("/company-admin-assignment");
+    revalidateCompanyAdminAssignmentRoutes();
 
     return {
       ok: true,
-      message: "Administrador desasignado correctamente.",
+      message: "Contacto desasignado correctamente.",
     };
   } catch (error) {
     return {
@@ -657,7 +691,7 @@ export async function removeCompanyAdmin(
       message:
         error instanceof Error
           ? error.message
-          : "No fue posible desasignar al administrador.",
+          : "No fue posible desasignar al contacto de empresa.",
     };
   }
 }

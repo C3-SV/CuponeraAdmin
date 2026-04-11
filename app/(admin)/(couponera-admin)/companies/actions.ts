@@ -49,6 +49,13 @@ const DEFAULT_QUERY: CompanyQueryParams = {
   pageSize: 10,
 };
 
+// Revalida rutas impactadas por cambios de empresas.
+function revalidateCompanyRoutes() {
+  revalidatePath("/companies");
+  revalidatePath("/dashboard");
+  revalidatePath("/approved-offers-stats");
+}
+
 // Normaliza y protege los parámetros de lista para evitar valores inválidos.
 function normalizeQueryParams(
   params?: Partial<CompanyQueryParams>,
@@ -504,7 +511,7 @@ export async function createCompany(
       };
     }
 
-    revalidatePath("/companies");
+    revalidateCompanyRoutes();
 
     return {
       ok: true,
@@ -596,7 +603,7 @@ export async function updateCompany(
       };
     }
 
-    revalidatePath("/companies");
+    revalidateCompanyRoutes();
 
     return {
       ok: true,
@@ -636,7 +643,7 @@ export async function softDeleteCompany(
       };
     }
 
-    revalidatePath("/companies");
+    revalidateCompanyRoutes();
 
     return {
       ok: true,
