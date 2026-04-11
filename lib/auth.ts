@@ -1,3 +1,4 @@
+// lib/auth.ts
 import { redirect } from "next/navigation";
 import type { DbUserRole } from "@/lib/roles";
 import { createClient } from "@/lib/supabase/server";
@@ -13,6 +14,7 @@ export type AuthProfile = {
   user_role: AppRole;
   user_is_active: boolean;
   company_id: string | null;
+  company_name: string | null;
 };
 
 export async function getCurrentAuthProfile(): Promise<AuthProfile | null> {
@@ -26,9 +28,17 @@ export async function getCurrentAuthProfile(): Promise<AuthProfile | null> {
 
   const { data: profile, error } = await supabase
     .from("profiles")
-    .select(
-      "user_id, first_names, last_names, user_role, user_is_active, company_id"
-    )
+    .select(`
+      user_id,
+      first_names,
+      last_names,
+      user_role,
+      user_is_active,
+      company_id,
+      companies:company_id (
+        company_name
+      )
+    `)
     .eq("user_id", user.id)
     .maybeSingle();
 
@@ -37,6 +47,9 @@ export async function getCurrentAuthProfile(): Promise<AuthProfile | null> {
   }
 
   if (!profile) return null;
+
+  const company =
+    Array.isArray(profile.companies) ? profile.companies[0] : profile.companies;
 
   return {
     user_id: profile.user_id,
@@ -47,6 +60,7 @@ export async function getCurrentAuthProfile(): Promise<AuthProfile | null> {
     user_role: profile.user_role,
     user_is_active: profile.user_is_active,
     company_id: profile.company_id,
+    company_name: company?.company_name ?? null,
   };
 }
 
@@ -63,7 +77,8 @@ export async function requireAdminProfile() {
 
   if (
     profile.user_role !== "ADMIN_PLATFORM" &&
-    profile.user_role !== "ADMIN_COMPANY"
+    profile.user_role !== "ADMIN_COMPANY" &&
+    profile.user_role !== "EMPLOYEE"
   ) {
     redirect("/auth/login?error=unauthorized");
   }
