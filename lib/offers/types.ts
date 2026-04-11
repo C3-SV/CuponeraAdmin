@@ -67,22 +67,9 @@ export type OfferListDetail = {
   item_sort_order: number;
 };
 
-export type OfferOrderDetail = {
-  order_item_id: string;
-  order_id: string | null;
-  order_status: string;
-  order_paid_at: string | null;
-  order_payment_ref: string | null;
-  quantity: number;
-  unit_price: number;
-  subtotal: number;
-  created_at: string;
-};
-
 export type OfferDetail = OfferListItem & {
   images: OfferImage[];
   list_details: OfferListDetail[];
-  order_details: OfferOrderDetail[];
 };
 
 export type OffersListResponse = {

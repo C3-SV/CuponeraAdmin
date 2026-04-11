@@ -130,6 +130,86 @@ function getSortIndicator(field: OfferSortBy, query: OfferQueryParams): string {
   return query.sortDir === "asc" ? "\u2191" : "\u2193";
 }
 
+function DetailIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 20 20"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      className="h-3.5 w-3.5"
+    >
+      <circle cx="10" cy="10" r="7" />
+      <line x1="10" y1="8.3" x2="10" y2="13.4" />
+      <circle cx="10" cy="5.8" r="0.9" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+function ApproveIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 20 20"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.9"
+      className="h-3.5 w-3.5"
+    >
+      <path d="m4.5 10.3 3.4 3.4 7.6-7.4" />
+    </svg>
+  );
+}
+
+function RejectIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 20 20"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.9"
+      className="h-3.5 w-3.5"
+    >
+      <path d="m5.5 5.5 9 9M14.5 5.5l-9 9" />
+    </svg>
+  );
+}
+
+function DiscardIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 20 20"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      className="h-3.5 w-3.5"
+    >
+      <path d="M3.8 5.8h12.4" />
+      <path d="M7.2 5.8V4.5a1 1 0 0 1 1-1h3.6a1 1 0 0 1 1 1v1.3" />
+      <path d="M5.9 5.8v9.2a1 1 0 0 0 1 1h6.2a1 1 0 0 0 1-1V5.8" />
+      <path d="M8.5 8.4v5.1M11.5 8.4v5.1" />
+    </svg>
+  );
+}
+
+function CloseIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 20 20"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.9"
+      className="h-4 w-4"
+    >
+      <path d="m5.5 5.5 9 9M14.5 5.5l-9 9" />
+    </svg>
+  );
+}
+
 export function OffersReview({ initialList, companies }: OffersReviewProps) {
   const [query, setQuery] = useState<OfferQueryParams>({
     ...DEFAULT_QUERY,
@@ -595,7 +675,7 @@ export function OffersReview({ initialList, companies }: OffersReviewProps) {
                       <td className="px-4 py-3">
                         {(() => {
                           const buttonBaseClass =
-                            "w-full rounded-lg px-2 py-1.5 text-[11px] font-medium leading-none whitespace-nowrap";
+                            "inline-flex w-full items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-[11px] font-medium leading-none whitespace-nowrap";
 
                           return (
                             <div className="mx-auto grid w-[184px] grid-cols-2 gap-2">
@@ -604,6 +684,7 @@ export function OffersReview({ initialList, companies }: OffersReviewProps) {
                                 onClick={() => void openDetailModal(offer)}
                                 className={`${buttonBaseClass} border border-[var(--border)] text-[var(--text-primary)] hover:bg-[var(--surface-soft)]`}
                               >
+                                <DetailIcon />
                                 Detalle
                               </button>
 
@@ -612,6 +693,7 @@ export function OffersReview({ initialList, companies }: OffersReviewProps) {
                                 onClick={() => void handleApproveOffer(offer)}
                                 className={`${buttonBaseClass} bg-green-600 text-white hover:bg-green-700`}
                               >
+                                <ApproveIcon />
                                 Aprobar
                               </button>
 
@@ -620,6 +702,7 @@ export function OffersReview({ initialList, companies }: OffersReviewProps) {
                                 onClick={() => void handleRejectOffer(offer)}
                                 className={`${buttonBaseClass} bg-red-600 text-white hover:bg-red-700`}
                               >
+                                <RejectIcon />
                                 Rechazar
                               </button>
 
@@ -628,6 +711,7 @@ export function OffersReview({ initialList, companies }: OffersReviewProps) {
                                 onClick={() => void handleDiscardOffer(offer)}
                                 className={`${buttonBaseClass} bg-[var(--brand-orange)] text-white hover:bg-[var(--brand-orange-strong)]`}
                               >
+                                <DiscardIcon />
                                 Descartar
                               </button>
                             </div>
@@ -694,9 +778,10 @@ export function OffersReview({ initialList, companies }: OffersReviewProps) {
               <button
                 type="button"
                 onClick={() => setIsDetailModalOpen(false)}
-                className="rounded-lg border border-[var(--border)] px-2.5 py-1.5 text-sm text-[var(--text-muted)] hover:bg-[var(--surface-soft)]"
+                aria-label="Cerrar detalle de oferta"
+                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[var(--border)] text-[var(--text-muted)] hover:bg-[var(--surface-soft)]"
               >
-                Cerrar
+                <CloseIcon />
               </button>
             </header>
 
@@ -817,71 +902,6 @@ export function OffersReview({ initialList, companies }: OffersReviewProps) {
                 ) : (
                   <p className="mt-2 text-sm text-[var(--text-muted)]">
                     No hay detalles adicionales registrados.
-                  </p>
-                )}
-              </div>
-
-              <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] p-4">
-                <p className="text-sm font-medium text-[var(--text-primary)]">
-                  Ordenes asociadas
-                </p>
-                {detailData?.order_details.length ? (
-                  <div className="mt-3 overflow-x-auto rounded-lg border border-[var(--border)] bg-white">
-                    <table className="min-w-full divide-y divide-[var(--border)] text-sm">
-                      <thead className="bg-[var(--surface-soft)]">
-                        <tr>
-                          <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">
-                            Orden
-                          </th>
-                          <th className="px-3 py-2 text-center text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">
-                            Estado
-                          </th>
-                          <th className="px-3 py-2 text-center text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">
-                            Cantidad
-                          </th>
-                          <th className="px-3 py-2 text-center text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">
-                            Subtotal
-                          </th>
-                          <th className="px-3 py-2 text-center text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">
-                            Pago
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-[var(--border)]">
-                        {detailData.order_details.map((order) => (
-                          <tr key={order.order_item_id}>
-                            <td className="px-3 py-2 text-[var(--text-primary)]">
-                              <span className="block max-w-[160px] truncate">
-                                {order.order_id ?? "Sin orden"}
-                              </span>
-                              {order.order_payment_ref ? (
-                                <span className="block max-w-[160px] truncate text-xs text-[var(--text-muted)]">
-                                  Ref: {order.order_payment_ref}
-                                </span>
-                              ) : null}
-                            </td>
-                            <td className="px-3 py-2 text-center text-[var(--text-muted)]">
-                              {order.order_status}
-                            </td>
-                            <td className="px-3 py-2 text-center text-[var(--text-primary)]">
-                              {order.quantity}
-                            </td>
-                            <td className="px-3 py-2 text-center text-[var(--text-primary)]">
-                              {formatCurrency(order.subtotal)}
-                            </td>
-                            <td className="px-3 py-2 text-center text-[var(--text-muted)]">
-                              {order.order_paid_at
-                                ? formatDateTime(order.order_paid_at)
-                                : "Pendiente"}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <p className="mt-2 text-sm text-[var(--text-muted)]">
-                    No hay ordenes asociadas a esta oferta.
                   </p>
                 )}
               </div>
