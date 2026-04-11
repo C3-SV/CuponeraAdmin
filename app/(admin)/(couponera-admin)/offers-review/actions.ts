@@ -189,6 +189,10 @@ function toOfferImage(
   };
 }
 
+function hasUsableImageUrl(row: OfferImageRow): boolean {
+  return row.image_url.trim().length > 0;
+}
+
 function toOfferListDetail(row: OfferListDetailRow): OfferListDetail {
   return {
     offer_list_detail_id: row.offer_list_detail_id,
@@ -412,9 +416,9 @@ export async function getOfferDetail(
       ...toOfferListItem(offer as OfferRow),
       images: imagesResult.error
         ? []
-        : ((imagesResult.data ?? []) as OfferImageRow[]).map((image) =>
-            toOfferImage(image, supabase),
-          ),
+        : ((imagesResult.data ?? []) as OfferImageRow[])
+            .filter(hasUsableImageUrl)
+            .map((image) => toOfferImage(image, supabase)),
       list_details: listDetailsResult.error
         ? []
         : ((listDetailsResult.data ?? []) as OfferListDetailRow[]).map(
