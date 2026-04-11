@@ -4,10 +4,15 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useMemo, useState } from "react";
-import { getVisibleSections, type NavIconName } from "@/lib/navigation";
+import { type AppRole, getVisibleSections, type NavIconName } from "@/lib/navigation";
 
 type DashboardShellProps = {
   children: React.ReactNode;
+  activeRole: AppRole;
+  user: {
+    firstName: string;
+    lastName: string;
+  };
 };
 
 type IconProps = {
@@ -176,22 +181,21 @@ function isPathActive(currentPath: string, href: string): boolean {
   return currentPath === href || currentPath.startsWith(`${href}/`);
 }
 
-export function DashboardShell({ children }: DashboardShellProps) {
+export function DashboardShell({ children, activeRole, user }: DashboardShellProps) {
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-
+  const initials = `${user.firstName?.[0] ?? ""}${user.lastName?.[0] ?? ""
+    }`.toUpperCase();
   const sections = useMemo(() => {
-    // TODO: conectar rol real desde Supabase cuando auth/permisos este listo.
-    return getVisibleSections(null);
-  }, []);
+    return getVisibleSections(activeRole);
+  }, [activeRole]);
 
   return (
     <div className="min-h-screen p-3 sm:p-5">
       <div className="mx-auto grid min-h-[calc(100vh-1.5rem)] max-w-[1500px] rounded-3xl border border-[var(--border)] bg-[var(--surface)] shadow-[0_10px_26px_-20px_rgba(8,34,66,0.28)] lg:grid-cols-[300px_minmax(0,1fr)]">
         <aside
-          className={`fixed inset-y-3 left-3 z-30 flex w-[300px] flex-col rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[0_24px_60px_-36px_rgba(15,61,120,0.55)] transition-transform duration-300 ease-out lg:static lg:inset-auto lg:w-auto lg:rounded-none lg:border-0 lg:border-r lg:shadow-none lg:transition-none ${
-            mobileMenuOpen ? "translate-x-0" : "-translate-x-[110%] lg:translate-x-0"
-          }`}
+          className={`fixed inset-y-3 left-3 z-30 flex w-[300px] flex-col rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[0_24px_60px_-36px_rgba(15,61,120,0.55)] transition-transform duration-300 ease-out lg:static lg:inset-auto lg:w-auto lg:rounded-none lg:border-0 lg:border-r lg:shadow-none lg:transition-none ${mobileMenuOpen ? "translate-x-0" : "-translate-x-[110%] lg:translate-x-0"
+            }`}
         >
           <div className="rounded-2xl bg-linear-to-br from-[var(--brand-blue)] via-[var(--accent-strong)] to-[var(--brand-orange)] p-[1px]">
             <div className="rounded-[15px] bg-white/95 px-3 py-3">
@@ -238,18 +242,16 @@ export function DashboardShell({ children }: DashboardShellProps) {
                         <Link
                           href={item.href}
                           onClick={() => setMobileMenuOpen(false)}
-                          className={`group flex items-center gap-3 rounded-xl px-3.5 py-3 text-[15px] font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#6ea8ff] ${
-                            active
+                          className={`group flex items-center gap-3 rounded-xl px-3.5 py-3 text-[15px] font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#6ea8ff] ${active
                               ? "bg-[var(--accent)] text-white shadow-[0_12px_26px_-18px_rgba(15,61,120,0.72)]"
                               : "text-[var(--text-primary)] hover:bg-[var(--accent-soft)] hover:text-[var(--brand-blue)]"
-                          }`}
+                            }`}
                         >
                           <span
-                            className={`grid size-9 shrink-0 place-items-center rounded-lg transition ${
-                              active
+                            className={`grid size-9 shrink-0 place-items-center rounded-lg transition ${active
                                 ? "bg-white/20 text-white"
                                 : "bg-[#eaf1ff] text-[var(--brand-blue)] group-hover:bg-white"
-                            }`}
+                              }`}
                           >
                             <NavIcon name={item.icon} className="size-5" />
                           </span>
@@ -291,7 +293,7 @@ export function DashboardShell({ children }: DashboardShellProps) {
                   className="inline-flex items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2 hover:bg-[var(--surface-soft)]"
                 >
                   <span className="grid size-7 place-items-center rounded-full bg-[var(--brand-orange)] text-xs font-semibold text-white">
-                    AD
+                    {initials}
                   </span>
                   <span className="text-xs font-medium text-[var(--text-muted)]">
                     Mi perfil

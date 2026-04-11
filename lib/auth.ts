@@ -85,3 +85,13 @@ export async function requireAdminProfile() {
 
   return profile;
 }
+
+export async function requireRole(allowedRoles: AppRole[]) {
+  const profile = await requireAdminProfile();
+
+  if (!allowedRoles.includes(profile.user_role)) {
+    redirect("/dashboard");
+  }
+
+  return profile;
+}
