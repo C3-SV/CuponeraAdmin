@@ -25,6 +25,7 @@ export type ApprovedOfferStatsQueryParams = {
 export type ApprovedOfferStatsFilterOption = {
   id: string;
   name: string;
+  icon_url?: string | null;
 };
 
 export type ApprovedOfferStatsFilters = {
@@ -38,6 +39,7 @@ export type ApprovedOfferStatsItem = {
   offer_code: string;
   company_id: string;
   company_name: string;
+  company_commission_rate: number;
   category_id: string | null;
   category_name: string | null;
   offer_price: number;
@@ -46,7 +48,7 @@ export type ApprovedOfferStatsItem = {
   coupon_usage_deadline: string;
   coupon_quantity_limit: number | null;
   sold_coupons: number;
-  available_coupons: number | null;
+  available_coupons: number;
   total_revenue: number;
   service_fee: number;
 };

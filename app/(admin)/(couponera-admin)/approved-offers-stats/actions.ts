@@ -11,40 +11,33 @@ import type {
   ApprovedOfferStatsResponse,
 } from "@/lib/approved-offers-stats/types";
 
+// Tipo para cliente de Supabase server-side
 type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
 
-type CategoryRelation =
-  | {
-      category_id: string;
-      category_name: string;
-      deleted_at: string | null;
-    }
-  | {
-      category_id: string;
-      category_name: string;
-      deleted_at: string | null;
-    }[]
-  | null;
+// Estructura de categoría desde Supabase (individual o en relación)
+type CategoryRow = {
+  category_id: string;
+  category_name: string;
+  deleted_at: string | null;
+};
 
-type CompanyRelation =
-  | {
-      company_id: string;
-      company_name: string;
-      company_commission_rate: number;
-      category_id: string | null;
-      deleted_at: string | null;
-      categories: CategoryRelation;
-    }
-  | {
-      company_id: string;
-      company_name: string;
-      company_commission_rate: number;
-      category_id: string | null;
-      deleted_at: string | null;
-      categories: CategoryRelation;
-    }[]
-  | null;
+// Categoría puede venir como un objeto, arreglo o nulo desde Supabase
+type CategoryRelation = CategoryRow | CategoryRow[] | null;
 
+// Estructura de empresa con relación a categorías desde Supabase
+type CompanyRow = {
+  company_id: string;
+  company_name: string;
+  company_commission_rate: number;
+  category_id: string | null;
+  deleted_at: string | null;
+  categories: CategoryRelation;
+};
+
+// Empresa puede venir como un objeto, arreglo o nulo desde Supabase
+type CompanyRelation = CompanyRow | CompanyRow[] | null;
+
+// Estructura de oferta con relaciones a empresas, categorías y órdenes de items
 type OfferRow = {
   offer_id: string;
   offer_title: string;
@@ -58,13 +51,10 @@ type OfferRow = {
   order_items: {
     quantity: number;
     deleted_at: string | null;
-    orders: {
-      order_status: string;
-      deleted_at: string | null;
-    } | null;
   }[];
 };
 
+// Parámetros por defecto para consultas de estadísticas de ofertas
 const DEFAULT_QUERY: ApprovedOfferStatsQueryParams = {
   search: "",
   companyId: "",
@@ -75,6 +65,7 @@ const DEFAULT_QUERY: ApprovedOfferStatsQueryParams = {
   pageSize: 10,
 };
 
+// KPIs vacíos para retornar cuando hay errores o no hay datos
 const EMPTY_KPIS: ApprovedOfferStatsKpis = {
   total_approved_offers: 0,
   total_sold_coupons: 0,
@@ -84,6 +75,7 @@ const EMPTY_KPIS: ApprovedOfferStatsKpis = {
   unlimited_offers_count: 0,
 };
 
+// Gráficos vacíos para retornar cuando hay errores o no hay datos
 const EMPTY_CHARTS: ApprovedOfferStatsCharts = {
   top_revenue_offers: [],
   sold_vs_available: {
@@ -93,6 +85,7 @@ const EMPTY_CHARTS: ApprovedOfferStatsCharts = {
   },
 };
 
+// Normaliza y protege los parámetros de consulta para evitar valores inválidos.
 function normalizeQueryParams(
   params?: Partial<ApprovedOfferStatsQueryParams>,
 ): ApprovedOfferStatsQueryParams {
@@ -113,15 +106,18 @@ function normalizeQueryParams(
   };
 }
 
+// Redondea un valor numérico a dos decimales para dinero.
 function roundMoney(value: number): number {
   return Number(value.toFixed(2));
 }
 
+// Convierte un valor a número o retorna 0 si no es válido.
 function toNumberOrZero(value: unknown): number {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+// Convierte un valor a número o retorna null si no es válido.
 function toNumberOrNull(value: unknown): number | null {
   if (value === null || value === undefined) {
     return null;
@@ -130,10 +126,12 @@ function toNumberOrNull(value: unknown): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+// Genera un código corto de oferta en formato OFR-XXXXXXXX a partir del ID.
 function shortOfferCode(offerId: string): string {
   return `OFR-${offerId.slice(0, 8).toUpperCase()}`;
 }
 
+// Extrae la empresa de una fila de oferta, manejando relación como objeto o arreglo.
 function getCompanyFromOffer(row: OfferRow) {
   if (!row.companies) {
     return null;
@@ -146,18 +144,40 @@ function getCompanyFromOffer(row: OfferRow) {
   return row.companies;
 }
 
-function getCategoryFromCompany(company: NonNullable<CompanyRelation>) {
-  if (!company.categories) {
+// Extrae la categoría de una empresa, manejo de relación como objeto o arreglo.
+function getCategoryFromCompany(company: NonNullable<CompanyRelation>): CategoryRow | null {
+  if (!company) {
     return null;
   }
 
-  if (Array.isArray(company.categories)) {
-    return company.categories[0] ?? null;
+  const companyRow = Array.isArray(company) ? company[0] : company;
+  if (!companyRow?.categories) {
+    return null;
   }
 
-  return company.categories;
+  return Array.isArray(companyRow.categories)
+    ? companyRow.categories[0] ?? null
+    : companyRow.categories;
 }
 
+// Construye la URL pública de icono de categoría si en BD solo hay path relativo.
+function buildCategoryIconUrl(
+  supabase: SupabaseServerClient,
+  categoryImg: string | null,
+): string | null {
+  if (!categoryImg) {
+    return null;
+  }
+
+  if (categoryImg.startsWith("http://") || categoryImg.startsWith("https://")) {
+    return categoryImg;
+  }
+
+  return supabase.storage.from("categories-icons").getPublicUrl(categoryImg).data
+    .publicUrl;
+}
+
+// Compara dos valores de cupones disponibles (posiblemente null para ilimitado).
 function compareNullableAvailable(
   left: number | null,
   right: number | null,
@@ -175,6 +195,7 @@ function compareNullableAvailable(
   return sortDir === "asc" ? left - right : right - left;
 }
 
+// Calcula KPIs agregados (totales) a partir de items procesados de ofertas.
 function buildKpis(items: ApprovedOfferStatsItem[]): ApprovedOfferStatsKpis {
   const totals = items.reduce(
     (accumulator, item) => {
@@ -207,6 +228,7 @@ function buildKpis(items: ApprovedOfferStatsItem[]): ApprovedOfferStatsKpis {
   };
 }
 
+// Construye datos de gráficos (top 5 ingresos y proporción vendido/disponible).
 function buildCharts(items: ApprovedOfferStatsItem[], kpis: ApprovedOfferStatsKpis) {
   const top_revenue_offers: ApprovedOfferRevenueBar[] = [...items]
     .sort((left, right) => right.total_revenue - left.total_revenue)
@@ -227,6 +249,7 @@ function buildCharts(items: ApprovedOfferStatsItem[], kpis: ApprovedOfferStatsKp
   };
 }
 
+// Ordena items de ofertas por el campo y dirección especificada en parámetros.
 function sortItems(
   items: ApprovedOfferStatsItem[],
   params: ApprovedOfferStatsQueryParams,
@@ -286,25 +309,35 @@ function sortItems(
   return sorted;
 }
 
+// Carga los filtros dinámicos (Compañías y Categorías) para los selects del Dashboard.
+// Retorna listas de empresas con ofertas aprobadas y categorías con iconos.
 export async function listApprovedOfferStatsFilters(): Promise<ApprovedOfferStatsFilters> {
   try {
     const supabase = await createClient();
-    const { data, error } = await supabase
-      .from("offers")
-      .select(
-        "company_id, companies(company_id, company_name, deleted_at, category_id, categories(category_id, category_name, deleted_at))",
-      )
-      .eq("offer_status", "APPROVED")
-      .is("deleted_at", null);
 
-    if (error || !data?.length) {
+    // Obtiene ofertas aprobadas y categorías en paralelo para los filtros
+    const [offersRes, categoriesRes] = await Promise.all([
+      supabase
+        .from("offers")
+        .select(
+          "company_id, companies(company_id, company_name, deleted_at, category_id, categories(category_id, category_name, deleted_at))",
+        )
+        .eq("offer_status", "APPROVED")
+        .is("deleted_at", null),
+      supabase
+        .from("categories")
+        .select("category_id, category_name, category_img")
+        .is("deleted_at", null)
+        .order("category_name", { ascending: true }),
+    ]);
+
+    if (offersRes.error) {
       return { companies: [], categories: [] };
     }
 
+    // Extrae empresas únicas de las ofertas aprobadas
     const companyMap = new Map<string, { id: string; name: string }>();
-    const categoryMap = new Map<string, { id: string; name: string }>();
-
-    (data as OfferRow[]).forEach((row) => {
+    (offersRes.data as OfferRow[]).forEach((row) => {
       const company = getCompanyFromOffer(row);
       if (!company || company.deleted_at) {
         return;
@@ -313,21 +346,23 @@ export async function listApprovedOfferStatsFilters(): Promise<ApprovedOfferStat
         id: company.company_id,
         name: company.company_name,
       });
+    });
 
-      const category = getCategoryFromCompany(company);
-      if (category && !category.deleted_at) {
-        categoryMap.set(category.category_id, {
-          id: category.category_id,
-          name: category.category_name,
-        });
-      }
+    // Mapea categorías y construye URLs de iconos
+    const categories = (categoriesRes.data ?? []).map((category) => {
+      const category_img = (category as { category_img: string | null }).category_img;
+      return {
+        id: (category as { category_id: string }).category_id,
+        name: (category as { category_name: string }).category_name,
+        icon_url: buildCategoryIconUrl(supabase, category_img),
+      };
     });
 
     return {
       companies: [...companyMap.values()].sort((left, right) =>
         left.name.localeCompare(right.name, "es", { sensitivity: "base" }),
       ),
-      categories: [...categoryMap.values()].sort((left, right) =>
+      categories: categories.sort((left, right) =>
         left.name.localeCompare(right.name, "es", { sensitivity: "base" }),
       ),
     };
@@ -336,6 +371,8 @@ export async function listApprovedOfferStatsFilters(): Promise<ApprovedOfferStat
   }
 }
 
+// Carga y procesa estadísticas de ofertas aprobadas con filtros, búsqueda, ordenamiento y paginación.
+// Calcula KPIs (ingresos, cupones vendidos, comisión) y gráficos.
 export async function listApprovedOfferStats(
   rawParams?: Partial<ApprovedOfferStatsQueryParams>,
 ): Promise<ApprovedOfferStatsResponse> {
@@ -347,10 +384,12 @@ export async function listApprovedOfferStats(
 
   try {
     const supabase = await createClient();
+    
+    // Consulta ofertas aprobadas con relaciones a empresas, categorías y órdenes de items
     const { data: offersData, error: offersError } = await supabase
       .from("offers")
       .select(
-        "offer_id, offer_title, offer_price, offer_start_date, offer_end_date, coupon_usage_deadline, coupon_quantity_limit, company_id, companies(company_id, company_name, company_commission_rate, category_id, deleted_at, categories(category_id, category_name, deleted_at)), order_items(quantity, deleted_at, orders(order_status, deleted_at))",
+        "offer_id, offer_title, offer_price, offer_start_date, offer_end_date, coupon_usage_deadline, coupon_quantity_limit, company_id, companies(company_id, company_name, company_commission_rate, category_id, deleted_at, categories(category_id, category_name, deleted_at)), order_items(quantity, deleted_at)",
       )
       .eq("offer_status", "APPROVED")
       .is("deleted_at", null);
@@ -367,6 +406,7 @@ export async function listApprovedOfferStats(
       };
     }
 
+    // Mapea filas de Supabase a estructura interna normalizada
     const baseOffers = (offersData ?? [])
       .map((row) => {
         const offer = row as OfferRow;
@@ -395,6 +435,7 @@ export async function listApprovedOfferStats(
       })
       .filter((item): item is NonNullable<typeof item> => Boolean(item));
 
+    // Aplica filtros de búsqueda, empresa y categoría
     const searchTerm = params.search.trim().toLowerCase();
     const filteredOffers = baseOffers.filter((offer) => {
       const matchesSearch =
@@ -411,13 +452,20 @@ export async function listApprovedOfferStats(
       return matchesSearch && matchesCompany && matchesCategory;
     });
 
+    // Computa estadísticas de cada oferta: ingresos, comisión, cupones vendidos
     const computedItems: ApprovedOfferStatsItem[] = filteredOffers.map((offer) => {
-      const soldCoupons = offer.order_items.filter(oi => oi.deleted_at == null && oi.orders?.deleted_at == null && oi.orders?.order_status === 'COMPLETED').reduce((acc, oi) => acc + oi.quantity, 0);
-      const availableCoupons =
-        offer.coupon_quantity_limit === null
-          ? null
-          : Math.max(offer.coupon_quantity_limit - soldCoupons, 0);
+      // Suma cantidad de cupones de order_items no eliminados
+      const soldCoupons = offer.order_items
+        .filter((oi) => oi.deleted_at == null)
+        .reduce((acc, oi) => acc + oi.quantity, 0);
+      // Calcula disponibles restando vendidos del límite
+      const availableCoupons = Math.max(
+        0,
+        Number(offer.coupon_quantity_limit ?? 0) - soldCoupons,
+      );
+      // Calcula ingresos totales (precio × cupones vendidos)
       const totalRevenue = roundMoney(soldCoupons * offer.offer_price);
+      // Calcula cargo por servicio basado en tasa de comisión de la empresa
       const serviceFee = roundMoney(totalRevenue * offer.company_commission_rate);
 
       return {
@@ -426,6 +474,7 @@ export async function listApprovedOfferStats(
         offer_code: shortOfferCode(offer.offer_id),
         company_id: offer.company_id,
         company_name: offer.company_name,
+        company_commission_rate: offer.company_commission_rate,
         category_id: offer.category_id,
         category_name: offer.category_name,
         offer_price: offer.offer_price,
@@ -440,6 +489,7 @@ export async function listApprovedOfferStats(
       };
     });
 
+    // Ordena, calcula KPIs, construye gráficos y pagina resultados
     const sortedItems = sortItems(computedItems, params);
     const kpis = buildKpis(sortedItems);
     const charts = buildCharts(sortedItems, kpis);
@@ -468,181 +518,3 @@ export async function listApprovedOfferStats(
     };
   }
 }
-
-/*"use server";
-
-import { createClient } from "@/lib/supabase/server";
-import type {
-  ApprovedOfferStatsFilters,
-  ApprovedOfferStatsItem,
-  ApprovedOfferStatsQueryParams,
-  ApprovedOfferStatsResponse,
-} from "@/lib/approved-offers-stats/types";
-
-// Mapeo y protección de parámetros de búsqueda y paginación
-function normalizeQueryParams(
-  params?: Partial<ApprovedOfferStatsQueryParams>
-): ApprovedOfferStatsQueryParams {
-  return {
-    search: params?.search?.trim() ?? "",
-    companyId: params?.companyId ?? "",
-    categoryId: params?.categoryId ?? "",
-    sortBy: params?.sortBy ?? "offer_title",
-    sortDir: params?.sortDir ?? "asc",
-    page: Number(params?.page ?? 1) || 1,
-    pageSize: Math.min(50, Number(params?.pageSize ?? 10) || 10),
-  };
-}
-
-// Carga los filtros dinámicos (Compañías y Categorías) para los selects del Dashboard
-export async function listApprovedOfferStatsFilters(): Promise<ApprovedOfferStatsFilters> {
-  const supabase = await createClient();
-
-  const [companiesRes, categoriesRes] = await Promise.all([
-    supabase.from("companies").select("company_id, company_name").is("deleted_at", null).order("company_name"),
-    supabase.from("categories").select("category_id, category_name").is("deleted_at", null).order("category_name"),
-  ]);
-
-  return {
-    companies: (companiesRes.data ?? []).map((c) => ({ id: c.company_id, name: c.company_name })),
-    categories: (categoriesRes.data ?? []).map((c) => ({ id: c.category_id, name: c.category_name })),
-  };
-}
-
-// Carga las ofertas, cruza las tablas y procesa las estadísticas requeridas por la UI
-export async function listApprovedOfferStats(
-  rawParams?: Partial<ApprovedOfferStatsQueryParams>
-): Promise<ApprovedOfferStatsResponse> {
-  const params = normalizeQueryParams(rawParams);
-  const supabase = await createClient();
-
-  try {
-    // Consultamos las ofertas, cruzamos con categories/companies
-    // y anidamos order_items junto con su respectiva order para verificar el status
-    let query = supabase
-      .from("offers")
-      .select(`
-        offer_id,
-        offer_title,
-        offer_price,
-        offer_start_date,
-        offer_end_date,
-        coupon_usage_deadline,
-        coupon_quantity_limit,
-        companies!inner (
-          company_id,
-          company_name,
-          company_commission_rate,
-          categories!inner (
-            category_id,
-            category_name
-          )
-        ),
-        order_items (
-          quantity
-        )
-      `)
-      .eq("offer_status", "APPROVED") // Aseguramos que solo cuente las ofertas aprobadas
-      .is("deleted_at", null);
-
-    // Aplicamos filtros directos a la consulta
-    if (params.search) {
-      query = query.ilike("offer_title", `%${params.search}%`);
-    }
-    if (params.companyId) {
-      query = query.eq("company_id", params.companyId);
-    }
-
-    const { data, error } = await query;
-
-    if (error) {
-      throw new Error(error.message);
-    }
-
-    let offers = (data as any[]) || [];
-
-    // Filtro de categoría en memoria (para evitar limitantes de PostgREST con relaciones profundas)
-    if (params.categoryId) {
-      offers = offers.filter((o) => {
-        const cat = Array.isArray(o.companies?.categories) ? o.companies.categories[0] : o.companies?.categories;
-        return cat?.category_id === params.categoryId;
-      });
-    }
-
-    // Procesamiento de cálculos y métricas por cada Oferta
-    let processedItems: ApprovedOfferStatsItem[] = offers.map((offer) => {
-      const company = Array.isArray(offer.companies) ? offer.companies[0] : offer.companies;
-      const category = Array.isArray(company?.categories) ? company?.categories[0] : company?.categories;
-      
-      // Calcular la cantidad de cupones vendidos sumando las cantidades en las órdenes
-      const orderItems = offer.order_items || [];
-      const soldCoupons = orderItems.reduce((acc: number, curr: any) => acc + Number(curr.quantity), 0);
-      
-      // Ingresos: Precio de oferta * cantidad de cupones vendidos
-      const totalRevenue = soldCoupons * Number(offer.offer_price);
-      
-      // Cargo por servicio basado en la tasa de comisión de la empresa
-      const commissionRate = Number(company?.company_commission_rate || 0);
-      const serviceFee = totalRevenue * (commissionRate / 100);
-
-      // Cupones disponibles
-      const availableCoupons =
-        offer.coupon_quantity_limit !== null
-          ? Math.max(0, Number(offer.coupon_quantity_limit) - soldCoupons)
-          : null; // Null es ilimitado
-
-      return {
-        offer_id: offer.offer_id,
-        offer_title: offer.offer_title,
-        company_name: company?.company_name ?? "Sin Empresa",
-        category_name: category?.category_name ?? null,
-        offer_price: Number(offer.offer_price),
-        sold_coupons: soldCoupons,
-        available_coupons: availableCoupons,
-        total_revenue: totalRevenue,
-        service_fee: serviceFee,
-        offer_start_date: offer.offer_start_date,
-        offer_end_date: offer.offer_end_date,
-        coupon_usage_deadline: offer.coupon_usage_deadline,
-      };
-    });
-
-    // Ordenamiento Dinámico en memoria (permite ordenar sobre las columnas calculadas)
-    processedItems.sort((a, b) => {
-      const field = params.sortBy as keyof ApprovedOfferStatsItem;
-      let valA = a[field] ?? "";
-      let valB = b[field] ?? "";
-
-      if (valA < valB) return params.sortDir === "asc" ? -1 : 1;
-      if (valA > valB) return params.sortDir === "asc" ? 1 : -1;
-      return 0;
-    });
-
-    // Paginación
-    const total = processedItems.length;
-    const from = (params.page - 1) * params.pageSize;
-    const to = from + params.pageSize;
-    const paginatedItems = processedItems.slice(from, to);
-
-    // Cálculos de KPIs y gráficos globales para los KPIs de la parte superior
-    const totalSoldCoupons = processedItems.reduce((acc, curr) => acc + curr.sold_coupons, 0);
-    const totalRevenue = processedItems.reduce((acc, curr) => acc + curr.total_revenue, 0);
-    const totalServiceFee = processedItems.reduce((acc, curr) => acc + curr.service_fee, 0);
-    const unlimitedOffersCount = processedItems.filter((o) => o.available_coupons === null).length;
-    const availableFinite = processedItems.reduce((acc, curr) => acc + (curr.available_coupons || 0), 0);
-
-    const topRevenueOffers = [...processedItems]
-      .sort((a, b) => b.total_revenue - a.total_revenue)
-      .slice(0, 5) // Top 5 ofertas por ingreso
-      .map((o) => ({ offer_id: o.offer_id, offer_title: o.offer_title, total_revenue: o.total_revenue }));
-
-    return {
-      data: paginatedItems, total, page: params.page, pageSize: params.pageSize,
-      kpis: { total_approved_offers: total, total_sold_coupons: totalSoldCoupons, total_revenue: totalRevenue, total_service_fee: totalServiceFee, unlimited_offers_count: unlimitedOffersCount },
-      charts: { top_revenue_offers: topRevenueOffers, sold_vs_available: { sold: totalSoldCoupons, available_finite: availableFinite, unlimited_offers_count: unlimitedOffersCount } },
-    };
-  } catch (error) {
-    return { data: [], total: 0, page: params.page, pageSize: params.pageSize, error: error instanceof Error ? error.message : "Error al cargar las estadísticas.", kpis: { total_approved_offers: 0, total_sold_coupons: 0, total_revenue: 0, total_service_fee: 0, unlimited_offers_count: 0 }, charts: { top_revenue_offers: [], sold_vs_available: { sold: 0, available_finite: 0, unlimited_offers_count: 0 } } };
-  }
-}
-*/

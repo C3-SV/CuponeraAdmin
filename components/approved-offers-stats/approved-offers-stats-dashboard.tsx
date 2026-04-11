@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { listApprovedOfferStats } from "@/app/(admin)/(couponera-admin)/approved-offers-stats/actions";
 import type {
@@ -9,11 +10,13 @@ import type {
   ApprovedOfferStatsResponse,
 } from "@/lib/approved-offers-stats/types";
 
+// Props para el dashboard de estadísticas de ofertas aprobadas
 type ApprovedOffersStatsDashboardProps = {
   initialList: ApprovedOfferStatsResponse;
   filters: ApprovedOfferStatsFilters;
 };
 
+// Parámetros por defecto para la consulta (búsqueda, ordenamiento, paginación)
 const DEFAULT_QUERY: ApprovedOfferStatsQueryParams = {
   search: "",
   companyId: "",
@@ -24,6 +27,7 @@ const DEFAULT_QUERY: ApprovedOfferStatsQueryParams = {
   pageSize: 10,
 };
 
+// Retorna el indicador visual para el ordenamiento (↕ neutral, ↑ ascendente, ↓ descendente)
 function getSortIndicator(
   field: ApprovedOfferStatsQueryParams["sortBy"],
   query: ApprovedOfferStatsQueryParams,
@@ -34,6 +38,7 @@ function getSortIndicator(
   return query.sortDir === "asc" ? "\u2191" : "\u2193";
 }
 
+// Formatea un número como moneda USD en español (El Salvador)
 function formatCurrency(value: number): string {
   return new Intl.NumberFormat("es-SV", {
     style: "currency",
@@ -43,6 +48,7 @@ function formatCurrency(value: number): string {
   }).format(value);
 }
 
+// Formatea una fecha ISO a formato DD/MM/YYYY en español (El Salvador)
 function formatDate(value: string): string {
   return new Intl.DateTimeFormat("es-SV", {
     day: "2-digit",
@@ -51,6 +57,7 @@ function formatDate(value: string): string {
   }).format(new Date(value));
 }
 
+// Trunca un texto a una longitud máxima, agregando elipsis si excede
 function truncateLabel(value: string, maxLength: number): string {
   if (value.length <= maxLength) {
     return value;
@@ -58,6 +65,7 @@ function truncateLabel(value: string, maxLength: number): string {
   return `${value.slice(0, maxLength - 1)}…`;
 }
 
+// Tarjeta KPI que muestra una métrica con título, valor y pie de página opcional
 function KpiCard({
   title,
   value,
@@ -82,11 +90,13 @@ function KpiCard({
   );
 }
 
+// Gráfico de barras mostrando top 5 ofertas por ingresos totales
 function BarsChart({
   items,
 }: {
   items: ApprovedOfferStatsResponse["charts"]["top_revenue_offers"];
 }) {
+  // Calcula la altura de las barras en relación al máximo
   const maxRevenue = useMemo(
     () => Math.max(1, ...items.map((item) => item.total_revenue)),
     [items],
@@ -100,10 +110,12 @@ function BarsChart({
     );
   }
 
+  // Render barras de ingresos con gradiente y etiqueta de oferta
   return (
     <div className="grid gap-3 sm:grid-cols-5">
       {items.map((item) => {
-        const barHeight = Math.max(12, (item.total_revenue / maxRevenue) * 120);
+      // Calcula altura proporcional de cada barra
+      const barHeight = Math.max(12, (item.total_revenue / maxRevenue) * 120);
         return (
           <div
             key={item.offer_id}
@@ -128,17 +140,18 @@ function BarsChart({
   );
 }
 
+// Gráfico donut mostrando proporción de cupones vendidos vs disponibles
 function DonutChart({
   sold,
   available,
-  unlimitedOffersCount,
 }: {
   sold: number;
   available: number;
-  unlimitedOffersCount: number;
 }) {
+  // Calcula percentaje de cupones vendidos
   const total = sold + available;
   const soldPercent = total > 0 ? (sold / total) * 100 : 0;
+  // Calcula grados del conic-gradient en base al percentaje
   const soldDeg = (soldPercent / 100) * 360;
   const gradient =
     total > 0
@@ -164,10 +177,7 @@ function DonutChart({
             <span className="font-semibold">Cupones vendidos:</span> {sold}
           </p>
           <p className="text-sm text-[var(--text-primary)]">
-            <span className="font-semibold">Disponibles (finitos):</span> {available}
-          </p>
-          <p className="text-xs text-[var(--text-muted)]">
-            Ofertas ilimitadas: {unlimitedOffersCount}
+            <span className="font-semibold">Disponibles:</span> {available}
           </p>
         </div>
       </div>
@@ -175,10 +185,13 @@ function DonutChart({
   );
 }
 
+// Dashboard principal de estadísticas de ofertas aprobadas
+// Renderiza KPIs, gráficos, filtros, búsqueda y tabla paginada
 export function ApprovedOffersStatsDashboard({
   initialList,
   filters,
 }: ApprovedOffersStatsDashboardProps) {
+  // Estado: resultados de tabla, errores y carga
   const [query, setQuery] = useState<ApprovedOfferStatsQueryParams>({
     ...DEFAULT_QUERY,
     page: initialList.page,
@@ -191,6 +204,7 @@ export function ApprovedOffersStatsDashboard({
   );
   const [isTableLoading, setIsTableLoading] = useState(false);
 
+  // Refs para evitar race conditions en solicitudes assíncronas
   const queryRef = useRef<ApprovedOfferStatsQueryParams>({
     ...DEFAULT_QUERY,
     page: initialList.page,
@@ -199,16 +213,27 @@ export function ApprovedOffersStatsDashboard({
   const searchInitializedRef = useRef(false);
   const latestRequestIdRef = useRef(0);
 
+  // Memoiza la categoría seleccionada actual para mostrar su icono
+  const selectedFilterCategory = useMemo(
+    () =>
+      filters.categories.find((category) => category.id === query.categoryId) ?? null,
+    [filters.categories, query.categoryId],
+  );
+
+  // Calcula total de páginas basado en resultados filtrados
   const totalPages = useMemo(
     () => Math.max(1, Math.ceil(listResult.total / query.pageSize)),
     [listResult.total, query.pageSize],
   );
 
+  // Sincroniza ref de query cuando cambia el estado
   useEffect(() => {
     queryRef.current = query;
   }, [query]);
 
+  // Función para cargar estadísticas con validación de race conditions
   const loadStats = useCallback(async (nextQuery: ApprovedOfferStatsQueryParams) => {
+    // Genera ID de solicitud único para ignorar respuestas desactualizadas
     const requestId = latestRequestIdRef.current + 1;
     latestRequestIdRef.current = requestId;
     setIsTableLoading(true);
@@ -236,6 +261,7 @@ export function ApprovedOffersStatsDashboard({
     }
   }, []);
 
+  // Aplica cambios a los parámetros y recarga estadísticas
   const applyQueryPatch = useCallback(
     async (patch: Partial<ApprovedOfferStatsQueryParams>) => {
       const nextQuery = { ...queryRef.current, ...patch };
@@ -247,11 +273,13 @@ export function ApprovedOffersStatsDashboard({
   );
 
   useEffect(() => {
+    // No buscar en inicial, solo en cambios posteriores
     if (!searchInitializedRef.current) {
       searchInitializedRef.current = true;
       return;
     }
 
+    // Debounce para evitar solicitudes excesivas mientras el usuario escribe
     const timeoutId = window.setTimeout(() => {
       void applyQueryPatch({ search: searchInput.trim(), page: 1 });
     }, 350);
@@ -259,20 +287,16 @@ export function ApprovedOffersStatsDashboard({
     return () => window.clearTimeout(timeoutId);
   }, [searchInput, applyQueryPatch]);
 
+  // Maneja cambio de ordenamiento de columnas
   async function handleSort(sortBy: ApprovedOfferStatsQueryParams["sortBy"]) {
+    // Reutiliza ordenamiento anterior (toggle asc/desc) o inicia nuevo
     const nextSortDir =
       query.sortBy === sortBy && query.sortDir === "asc" ? "desc" : "asc";
     await applyQueryPatch({ sortBy, sortDir: nextSortDir, page: 1 });
   }
 
+  // Renderiza cantidad de cupones disponibles o vacío si ilimitado
   function renderAvailable(item: ApprovedOfferStatsItem) {
-    if (item.available_coupons === null) {
-      return (
-        <span className="inline-flex rounded-full bg-[var(--accent-soft)] px-2 py-0.5 text-xs font-semibold text-[var(--brand-blue)]">
-          Ilimitado
-        </span>
-      );
-    }
     return item.available_coupons;
   }
 
@@ -280,7 +304,7 @@ export function ApprovedOffersStatsDashboard({
     <section className="space-y-5 rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[0_6px_14px_-12px_rgba(15,23,42,0.24)] lg:p-7">
       <div className="space-y-1">
         <h1 className="text-2xl font-semibold tracking-tight text-[var(--text-primary)]">
-          Estadisticas de Ofertas Aprobadas
+          Estadisticas de Ofertas
         </h1>
         <p className="text-sm text-[var(--text-muted)]">
           Control de cupones vendidos, disponibles, ingresos y cargo por servicio.
@@ -289,7 +313,7 @@ export function ApprovedOffersStatsDashboard({
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <KpiCard
-          title="Ofertas aprobadas"
+          title="Ofertas"
           value={String(listResult.kpis.total_approved_offers)}
         />
         <KpiCard
@@ -303,11 +327,6 @@ export function ApprovedOffersStatsDashboard({
         <KpiCard
           title="Cargo por servicio"
           value={formatCurrency(listResult.kpis.total_service_fee)}
-          footer={
-            listResult.kpis.unlimited_offers_count > 0
-              ? `${listResult.kpis.unlimited_offers_count} oferta(s) sin limite`
-              : undefined
-          }
         />
       </div>
 
@@ -327,14 +346,11 @@ export function ApprovedOffersStatsDashboard({
             Proporcion vendidos vs disponibles
           </h2>
           <p className="mb-3 text-xs text-[var(--text-muted)]">
-            Disponible considera solo ofertas con limite definido.
+            Proporción de cupones vendidos frente a los disponibles.
           </p>
           <DonutChart
             sold={listResult.charts.sold_vs_available.sold}
             available={listResult.charts.sold_vs_available.available_finite}
-            unlimitedOffersCount={
-              listResult.charts.sold_vs_available.unlimited_offers_count
-            }
           />
         </div>
       </div>
@@ -363,20 +379,32 @@ export function ApprovedOffersStatsDashboard({
           ))}
         </select>
 
-        <select
-          value={query.categoryId}
-          onChange={(event) =>
-            void applyQueryPatch({ categoryId: event.target.value, page: 1 })
-          }
-          className="h-10 rounded-xl border border-[var(--border)] bg-white px-3 text-sm text-[var(--text-primary)]"
-        >
-          <option value="">Todas las categorias</option>
-          {filters.categories.map((category) => (
-            <option key={category.id} value={category.id}>
-              {category.name}
-            </option>
-          ))}
-        </select>
+        <div className="flex items-center gap-2">
+          <select
+            value={query.categoryId}
+            onChange={(event) =>
+              void applyQueryPatch({ categoryId: event.target.value, page: 1 })
+            }
+            className="h-10 rounded-xl border border-[var(--border)] bg-white px-3 text-sm text-[var(--text-primary)]"
+          >
+            <option value="">Todas las categorias</option>
+            {filters.categories.map((category) => (
+              <option key={category.id} value={category.id}>
+                {category.name}
+              </option>
+            ))}
+          </select>
+          {selectedFilterCategory?.icon_url ? (
+            <Image
+              src={selectedFilterCategory.icon_url}
+              alt={`Icono de ${selectedFilterCategory.name}`}
+              width={36}
+              height={36}
+              unoptimized
+              className="h-9 w-9 rounded-lg border border-[var(--border)] bg-white object-contain p-0.5"
+            />
+          ) : null}
+        </div>
 
         <label className="ml-auto inline-flex items-center gap-2 text-xs font-medium text-[var(--text-muted)]">
           Mostrar
@@ -512,7 +540,7 @@ export function ApprovedOffersStatsDashboard({
                   colSpan={8}
                   className="px-4 py-6 text-center text-sm text-[var(--text-muted)]"
                 >
-                  No hay ofertas aprobadas para mostrar.
+                  No hay ofertas para mostrar.
                 </td>
               </tr>
             ) : null}
@@ -530,7 +558,10 @@ export function ApprovedOffersStatsDashboard({
                       </p>
                     </td>
                     <td className="px-4 py-3 text-right text-sm text-[var(--text-primary)]">
-                      {formatCurrency(item.offer_price)}
+                      <p>{formatCurrency(item.offer_price)}</p>
+                      <p className="mt-1 text-xs text-[var(--text-muted)]">
+                        Comisión: {item.company_commission_rate.toFixed(2)}%
+                      </p>
                     </td>
                     <td className="px-4 py-3 text-right text-sm text-[var(--text-primary)]">
                       {item.sold_coupons}
@@ -544,16 +575,12 @@ export function ApprovedOffersStatsDashboard({
                     <td className="px-4 py-3 text-right text-sm text-[var(--text-primary)]">
                       {formatCurrency(item.service_fee)}
                     </td>
-                    <td className="px-4 py-3 text-xs text-[var(--text-muted)]">
-                      <p>
-                        Estado:{" "}
-                        <span className="inline-flex rounded-full bg-green-100 px-2 py-0.5 text-[11px] font-semibold text-green-700">
-                          Aprobada
-                        </span>
-                      </p>
-                      <p>Inicio: {formatDate(item.offer_start_date)}</p>
-                      <p>Fin: {formatDate(item.offer_end_date)}</p>
-                      <p>Canje: {formatDate(item.coupon_usage_deadline)}</p>
+                    <td className="px-4 py-4 text-xs text-[var(--text-muted)]">
+                      <div className="space-y-2">
+                        <p>Inicio: {formatDate(item.offer_start_date)}</p>
+                        <p>Fin: {formatDate(item.offer_end_date)}</p>
+                        <p>Canje: {formatDate(item.coupon_usage_deadline)}</p>
+                      </div>
                     </td>
                   </tr>
                 ))
