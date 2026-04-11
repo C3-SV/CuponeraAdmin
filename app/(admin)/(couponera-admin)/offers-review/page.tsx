@@ -1,11 +1,19 @@
-import { ModulePlaceholder } from "@/components/dashboard/module-placeholder";
+import { OffersReview } from "@/components/offers/offers-review";
+import { listOfferCompanies, listOffers } from "./actions";
 
-export default function OffersReviewPage() {
-  return (
-    <ModulePlaceholder
-      title="Revision de Ofertas"
-      description="Base para listar ofertas, aprobarlas o rechazarlas con comentarios, y eliminarlas."
-      ownerHint="Responsable: Persona 4"
-    />
-  );
+export default async function OffersReviewPage() {
+  const [initialList, companies] = await Promise.all([
+    listOffers({
+      search: "",
+      companyId: "",
+      state: "PENDING",
+      sortBy: "created_at",
+      sortDir: "desc",
+      page: 1,
+      pageSize: 10,
+    }),
+    listOfferCompanies(),
+  ]);
+
+  return <OffersReview initialList={initialList} companies={companies} />;
 }
