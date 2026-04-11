@@ -2,7 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 import { randomUUID } from "node:crypto";
+import { getCurrentAuthProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import type {
   CategoriesListResponse,
   CategoryActionResult,
@@ -17,6 +19,7 @@ import {
 } from "@/lib/categories/validation";
 
 type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
+type SupabaseAdminClient = ReturnType<typeof createAdminClient>;
 
 const DEFAULT_QUERY: CategoryQueryParams = {
   search: "",
@@ -39,6 +42,14 @@ function normalizeQueryParams(
       Number(params?.pageSize ?? DEFAULT_QUERY.pageSize) || DEFAULT_QUERY.pageSize,
     ),
   };
+}
+
+async function requireCouponeraAdmin(): Promise<void> {
+  const profile = await getCurrentAuthProfile();
+
+  if (!profile || !profile.user_is_active || profile.user_role !== "ADMIN_PLATFORM") {
+    throw new Error("No tienes permisos para administrar rubros.");
+  }
 }
 
 // Construye URL pública del icono desde path relativo en el bucket.
@@ -66,11 +77,10 @@ function parseDataUrl(payload: CategoryImagePayload): {
 
 // Sube el icono del rubro al bucket y devuelve la URL pública.
 async function uploadCategoryIcon(
+  supabaseAdmin: SupabaseAdminClient,
   payload: CategoryImagePayload,
   categoryId: string,
 ): Promise<{ ok: true; publicUrl: string; path: string } | { ok: false; message: string }> {
-  const supabase = await createClient();
-
   try {
     const { bytes, contentType } = parseDataUrl(payload);
     const extension =
@@ -80,7 +90,7 @@ async function uploadCategoryIcon(
     const safeExt = extension.replace(/[^a-z0-9]/g, "") || "png";
     const path = `categories/${categoryId}/${Date.now()}-${randomUUID()}.${safeExt}`;
 
-    const { error: uploadError } = await supabase.storage
+    const { error: uploadError } = await supabaseAdmin.storage
       .from("categories-icons")
       .upload(path, bytes, { contentType, upsert: false });
 
@@ -88,7 +98,7 @@ async function uploadCategoryIcon(
       return { ok: false, message: `No se pudo subir la imagen: ${uploadError.message}` };
     }
 
-    const { data } = supabase.storage.from("categories-icons").getPublicUrl(path);
+    const { data } = supabaseAdmin.storage.from("categories-icons").getPublicUrl(path);
     return { ok: true, publicUrl: data.publicUrl, path };
   } catch (error) {
     return {
@@ -109,6 +119,8 @@ export async function listCategories(
   const to = from + pageSize - 1;
 
   try {
+    await requireCouponeraAdmin();
+
     const supabase = await createClient();
     let query = supabase
       .from("categories")
@@ -172,8 +184,10 @@ export async function createCategory(
   }
 
   try {
-    const supabase = await createClient();
-    const { data: created, error: createError } = await supabase
+    await requireCouponeraAdmin();
+
+    const supabaseAdmin = createAdminClient();
+    const { data: created, error: createError } = await supabaseAdmin
       .from("categories")
       .insert({
         category_name: normalized.category_name,
@@ -189,14 +203,14 @@ export async function createCategory(
     const categoryId = (created as { category_id: string }).category_id;
 
     if (file) {
-      const uploadResult = await uploadCategoryIcon(file, categoryId);
+      const uploadResult = await uploadCategoryIcon(supabaseAdmin, file, categoryId);
 
       if (!uploadResult.ok) {
-        await supabase.from("categories").delete().eq("category_id", categoryId);
+        await supabaseAdmin.from("categories").delete().eq("category_id", categoryId);
         return { ok: false, message: uploadResult.message };
       }
 
-      const { error: updateError } = await supabase
+      const { error: updateError } = await supabaseAdmin
         .from("categories")
         .update({ category_img: uploadResult.path })
         .eq("category_id", categoryId);
@@ -231,7 +245,9 @@ export async function updateCategory(
   }
 
   try {
-    const supabase = await createClient();
+    await requireCouponeraAdmin();
+
+    const supabaseAdmin = createAdminClient();
     const payload: Record<string, unknown> = {
       category_name: normalized.category_name,
       alt_text: normalized.alt_text || null,
@@ -239,14 +255,14 @@ export async function updateCategory(
     };
 
     if (file) {
-      const uploadResult = await uploadCategoryIcon(file, categoryId);
+      const uploadResult = await uploadCategoryIcon(supabaseAdmin, file, categoryId);
       if (!uploadResult.ok) {
         return { ok: false, message: uploadResult.message };
       }
       payload.category_img = uploadResult.path;
     }
 
-    const { error } = await supabase
+    const { error } = await supabaseAdmin
       .from("categories")
       .update(payload)
       .eq("category_id", categoryId)
@@ -271,8 +287,10 @@ export async function softDeleteCategory(
   categoryId: string,
 ): Promise<CategoryActionResult> {
   try {
-    const supabase = await createClient();
-    const { error } = await supabase
+    await requireCouponeraAdmin();
+
+    const supabaseAdmin = createAdminClient();
+    const { error } = await supabaseAdmin
       .from("categories")
       .update({
         deleted_at: new Date().toISOString(),
