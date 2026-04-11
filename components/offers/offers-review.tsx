@@ -556,41 +556,60 @@ export function OffersReview({ initialList, companies }: OffersReviewProps) {
                         </span>
                       </td>
                       <td className="px-4 py-3">
-                        <div className="flex flex-wrap justify-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => setSelectedOffer(offer)}
-                            className="rounded-lg border border-[var(--border)] px-3 py-1.5 text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--surface-soft)]"
-                          >
-                            Detalle
-                          </button>
+                        {(() => {
+                          const isApproved = offer.offer_status === "APPROVED";
+                          const isRejected = offer.offer_status === "REJECTED";
+                          const isDiscarded = offer.offer_status === "DISCARDED";
 
-                          {offer.offer_status !== "DISCARDED" ? (
-                            <>
+                          const showApprove = !isApproved && !isDiscarded;
+                          const showReject = !isRejected && !isDiscarded;
+                          const showDiscard = !isDiscarded;
+
+                          const buttonBaseClass =
+                            "w-full rounded-lg px-2 py-1.5 text-[11px] font-medium leading-none whitespace-nowrap";
+
+                          return (
+                            <div className="mx-auto flex w-[110px] flex-col gap-2">
                               <button
                                 type="button"
-                                onClick={() => void handleApproveOffer(offer)}
-                                className="rounded-lg bg-green-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-green-700"
+                                onClick={() => setSelectedOffer(offer)}
+                                className={`${buttonBaseClass} border border-[var(--border)] text-[var(--text-primary)] hover:bg-[var(--surface-soft)]`}
                               >
-                                Aprobar
+                                Detalle
                               </button>
-                              <button
-                                type="button"
-                                onClick={() => void handleRejectOffer(offer)}
-                                className="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700"
-                              >
-                                Rechazar
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => void handleDiscardOffer(offer)}
-                                className="rounded-lg bg-[var(--brand-orange)] px-3 py-1.5 text-xs font-medium text-white hover:bg-[var(--brand-orange-strong)]"
-                              >
-                                Descartar
-                              </button>
-                            </>
-                          ) : null}
-                        </div>
+
+                              {showApprove ? (
+                                <button
+                                  type="button"
+                                  onClick={() => void handleApproveOffer(offer)}
+                                  className={`${buttonBaseClass} bg-green-600 text-white hover:bg-green-700`}
+                                >
+                                  Aprobar
+                                </button>
+                              ) : null}
+
+                              {showReject ? (
+                                <button
+                                  type="button"
+                                  onClick={() => void handleRejectOffer(offer)}
+                                  className={`${buttonBaseClass} bg-red-600 text-white hover:bg-red-700`}
+                                >
+                                  Rechazar
+                                </button>
+                              ) : null}
+
+                              {showDiscard ? (
+                                <button
+                                  type="button"
+                                  onClick={() => void handleDiscardOffer(offer)}
+                                  className={`${buttonBaseClass} bg-[var(--brand-orange)] text-white hover:bg-[var(--brand-orange-strong)]`}
+                                >
+                                  Descartar
+                                </button>
+                              ) : null}
+                            </div>
+                          );
+                        })()}
                       </td>
                     </tr>
                   ))
