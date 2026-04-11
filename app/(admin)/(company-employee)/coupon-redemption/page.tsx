@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import Swal from "sweetalert2";
 
-type InputMethod = "link" | "code";
+type InputMethod = "link" | "code" | "qr";
 type CouponStatus = "disponible" | "canjeado" | "vencido";
 type RedeemedSort = "newest" | "oldest";
 
@@ -15,6 +15,7 @@ type Coupon = {
   code: string;
   expiresAt: string;
   redeemedAt: string | null;
+  redeemedBy: string | null;
   customerId: string;
 };
 
@@ -130,6 +131,21 @@ function extractTokenFromLink(rawValue: string): string {
   }
 }
 
+function extractTokenFromQr(rawValue: string): string {
+  const cleanValue = rawValue.trim();
+
+  if (!cleanValue) {
+    return "";
+  }
+
+  if (cleanValue.includes("|")) {
+    const parts = cleanValue.split("|");
+    return parts[parts.length - 1].trim();
+  }
+
+  return cleanValue;
+}
+
 function formatDate(dateIso: string): string {
   return new Intl.DateTimeFormat("es-SV", {
     year: "numeric",
@@ -145,7 +161,9 @@ function getLookupToken(currentMethod: InputMethod, rawValue: string): string {
     return rawValue.trim();
   }
 
-  return extractTokenFromLink(rawValue).trim();
+  return currentMethod === "link"
+    ? extractTokenFromLink(rawValue).trim()
+    : extractTokenFromQr(rawValue).trim();
 }
 
 export default function CouponRedemptionPage() {
@@ -161,7 +179,7 @@ export default function CouponRedemptionPage() {
   const [redeemedPageSize, setRedeemedPageSize] = useState(5);
   const [redeemedPage, setRedeemedPage] = useState(1);
   const [feedback, setFeedback] = useState<string>(
-    "Ingresa el cupon por enlace o codigo para validarlo.",
+    "Ingresa el cupon por enlace, codigo o QR para validarlo.",
   );
 
   async function loadCoupons() {
@@ -195,7 +213,7 @@ export default function CouponRedemptionPage() {
         supabase
           .from("coupons")
           .select(
-            "coupon_id, order_item_id, coupon_code, coupon_issued_at, coupon_expires_at, coupon_redeemed_at, coupon_status, deleted_at",
+            "coupon_id, order_item_id, coupon_code, coupon_issued_at, coupon_expires_at, coupon_redeemed_at, coupon_redeemed_by, coupon_status, deleted_at",
           )
           .is("deleted_at", null),
         supabase
@@ -253,6 +271,7 @@ export default function CouponRedemptionPage() {
           code: coupon.coupon_code,
           expiresAt: coupon.coupon_expires_at,
           redeemedAt: coupon.coupon_redeemed_at,
+          redeemedBy: coupon.coupon_redeemed_by,
           customerId: order.customer_id,
         });
       }
@@ -261,7 +280,7 @@ export default function CouponRedemptionPage() {
       setCoupons(nextCoupons);
 
       if (!selectedCouponId) {
-        setFeedback("Ingresa el cupon por enlace o codigo para validarlo.");
+        setFeedback("Ingresa el cupon por enlace, codigo o QR para validarlo.");
       }
     } catch (error) {
       setLoadingError(
@@ -283,7 +302,7 @@ export default function CouponRedemptionPage() {
     const query = redeemedSearchInput.trim().toLowerCase();
     const filtered = query
       ? redeemed.filter((coupon) => {
-          return [coupon.offerTitle, coupon.customerName, coupon.code]
+          return [coupon.offerTitle, coupon.customerName, coupon.code, coupon.redeemedBy ?? ""]
             .join(" ")
             .toLowerCase()
             .includes(query);
@@ -354,7 +373,7 @@ export default function CouponRedemptionPage() {
       const { data } = await supabase
         .from("coupons")
         .select(
-          "coupon_id, order_item_id, coupon_code, coupon_issued_at, coupon_expires_at, coupon_redeemed_at, coupon_status, deleted_at",
+          "coupon_id, order_item_id, coupon_code, coupon_issued_at, coupon_expires_at, coupon_redeemed_at, coupon_redeemed_by, coupon_status, deleted_at",
         )
         .is("deleted_at", null)
         .ilike("coupon_code", token)
@@ -365,7 +384,7 @@ export default function CouponRedemptionPage() {
       const byIdResult = await supabase
         .from("coupons")
         .select(
-          "coupon_id, order_item_id, coupon_code, coupon_issued_at, coupon_expires_at, coupon_redeemed_at, coupon_status, deleted_at",
+          "coupon_id, order_item_id, coupon_code, coupon_issued_at, coupon_expires_at, coupon_redeemed_at, coupon_redeemed_by, coupon_status, deleted_at",
         )
         .is("deleted_at", null)
         .eq("coupon_id", token)
@@ -377,7 +396,7 @@ export default function CouponRedemptionPage() {
         const byCodeResult = await supabase
           .from("coupons")
           .select(
-            "coupon_id, order_item_id, coupon_code, coupon_issued_at, coupon_expires_at, coupon_redeemed_at, coupon_status, deleted_at",
+            "coupon_id, order_item_id, coupon_code, coupon_issued_at, coupon_expires_at, coupon_redeemed_at, coupon_redeemed_by, coupon_status, deleted_at",
           )
           .is("deleted_at", null)
           .ilike("coupon_code", token)
@@ -407,6 +426,7 @@ export default function CouponRedemptionPage() {
         code: couponRow.coupon_code,
         expiresAt: couponRow.coupon_expires_at,
         redeemedAt: couponRow.coupon_redeemed_at,
+        redeemedBy: couponRow.coupon_redeemed_by,
         customerId: "",
       };
     }
@@ -448,6 +468,7 @@ export default function CouponRedemptionPage() {
       code: couponRow.coupon_code,
       expiresAt: couponRow.coupon_expires_at,
       redeemedAt: couponRow.coupon_redeemed_at,
+      redeemedBy: couponRow.coupon_redeemed_by,
       customerId,
     };
   }
@@ -626,7 +647,7 @@ export default function CouponRedemptionPage() {
           Activacion y Canje de Cupon
         </h1>
         <p className="text-sm text-(--text-muted)">
-          Valida por enlace o codigo y confirma el canje solo si esta vigente y no
+          Valida por enlace, codigo o QR y confirma el canje solo si esta vigente y no
           ha sido usado.
         </p>
       </div>
@@ -661,6 +682,17 @@ export default function CouponRedemptionPage() {
           >
             Codigo
           </button>
+          <button
+            type="button"
+            onClick={() => setMethod("qr")}
+            className={`rounded-lg px-3 py-1.5 text-sm font-medium transition ${
+              method === "qr"
+                ? "bg-(--brand-blue) text-white"
+                : "border border-(--border) bg-(--surface) text-foreground"
+            }`}
+          >
+            QR
+          </button>
         </div>
 
         <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto_auto]">
@@ -671,7 +703,9 @@ export default function CouponRedemptionPage() {
             placeholder={
               method === "link"
                 ? "Pega el enlace del cupon o token"
-                : "Ingresa el codigo del cupon"
+                : method === "code"
+                  ? "Ingresa el codigo del cupon"
+                  : "Escanea o pega el valor QR"
             }
             className="h-10 w-full rounded-xl border border-(--border) bg-(--surface) px-3 text-sm text-foreground outline-none"
           />
@@ -725,6 +759,11 @@ export default function CouponRedemptionPage() {
                   {formatDate(selectedCoupon.redeemedAt)}
                 </p>
               ) : null}
+              {selectedCoupon.redeemedBy ? (
+                <p>
+                  <span className="font-medium">Canjeado por:</span> {selectedCoupon.redeemedBy}
+                </p>
+              ) : null}
             </div>
           ) : (
             <p className="text-sm text-(--text-muted)">
@@ -774,7 +813,7 @@ export default function CouponRedemptionPage() {
               setRedeemedSearchInput(event.target.value);
               setRedeemedPage(1);
             }}
-            placeholder="Buscar por oferta, cliente o codigo..."
+            placeholder="Buscar por oferta, cliente, codigo o usuario..."
             className="mb-3 h-9 w-full rounded-lg border border-(--border) bg-(--surface) px-3 text-xs text-foreground outline-none"
           />
 
@@ -795,6 +834,9 @@ export default function CouponRedemptionPage() {
                   <p className="text-xs text-(--text-muted)">
                     Canjeado: {coupon.redeemedAt ? formatDate(coupon.redeemedAt) : "-"}
                   </p>
+                  {coupon.redeemedBy ? (
+                    <p className="text-xs text-(--text-muted)">Usuario: {coupon.redeemedBy}</p>
+                  ) : null}
                 </article>
               ))
             )}
