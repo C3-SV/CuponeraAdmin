@@ -1,32 +1,78 @@
-// app/(admin)/(all-roles)/profile/page.tsx
 import { requireAdminProfile } from "@/lib/auth";
 import { logoutAction } from "@/app/auth/logout/actions";
-import { formatUserRole } from "@/lib/roles";
+import ProfileForm from "./profile-form";
 
 export default async function ProfilePage() {
   const profile = await requireAdminProfile();
 
   return (
-    <section className="space-y-4">
-      <h1 className="text-2xl font-semibold">Mi perfil</h1>
+    <section className="space-y-6">
+      <header className="rounded-2xl border border-[var(--border)] bg-white p-6 shadow-sm">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div className="space-y-2">
+            <p className="text-sm font-medium text-[var(--brand-blue)]">
+              Cuenta administrativa
+            </p>
+            <h1 className="text-2xl font-semibold tracking-tight text-[var(--text-primary)]">
+              Mi perfil
+            </h1>
+            <p className="max-w-2xl text-sm text-[var(--text-muted)]">
+              Actualiza tu información personal y administra tu cuenta.
+            </p>
+          </div>
 
-      <div className="rounded-xl border p-4 space-y-2">
-        <p><strong>Nombres:</strong> {profile.first_names}</p>
-        <p><strong>Apellidos:</strong> {profile.last_names}</p>
-        <p><strong>Correo:</strong> {profile.email}</p>
-        <p><strong>Rol:</strong> {formatUserRole(profile.user_role)}</p>
-        <p><strong>Activo:</strong> {profile.user_is_active ? "Sí" : "No"}</p>
-        <p><strong>Empresa:</strong> {profile.company_id ?? "No aplica"}</p>
+          <form action={logoutAction}>
+            <button
+              type="submit"
+              className="rounded-xl border border-[var(--border)] px-4 py-2.5 text-sm font-medium text-[var(--text-primary)] transition hover:bg-[var(--accent-soft)]"
+            >
+              Cerrar sesión
+            </button>
+          </form>
+        </div>
+      </header>
+
+      <div className="grid gap-6 xl:grid-cols-[1.4fr_0.9fr]">
+        <article className="rounded-2xl border border-[var(--border)] bg-white p-6 shadow-sm">
+          <div className="mb-6 flex items-start gap-4">
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[var(--accent-soft)] text-base font-semibold text-[var(--brand-blue)]">
+              {profile.first_names?.[0]}
+              {profile.last_names?.[0]}
+            </div>
+
+            <div className="space-y-1">
+              <h2 className="text-xl font-semibold text-[var(--text-primary)]">
+                {profile.full_name}
+              </h2>
+              <p className="text-sm text-[var(--text-muted)]">
+                {profile.email}
+              </p>
+            </div>
+          </div>
+
+          <ProfileForm
+            profile={{
+              first_names: profile.first_names,
+              last_names: profile.last_names,
+              email: profile.email,
+              user_role: profile.user_role,
+              company_name: profile.company_name,
+            }}
+          />
+        </article>
+
+        <aside className="space-y-6">
+          <div className="rounded-2xl border border-[var(--border)] bg-white p-6 shadow-sm">
+            <h2 className="text-base font-semibold text-[var(--text-primary)]">
+              Información de cuenta
+            </h2>
+            <p className="mt-2 text-sm text-[var(--text-muted)]">
+              Desde aquí puedes modificar tus datos personales. El rol y la
+              empresa asociada se muestran como referencia.
+            </p>
+          </div>
+        </aside>
       </div>
-
-      <form action={logoutAction}>
-        <button
-          type="submit"
-          className="rounded-lg bg-red-600 px-4 py-2 text-white hover:bg-red-700"
-        >
-          Cerrar sesión
-        </button>
-      </form>
     </section>
   );
 }
