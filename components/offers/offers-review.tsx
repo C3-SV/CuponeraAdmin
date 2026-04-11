@@ -154,6 +154,7 @@ export function OffersReview({ initialList, companies }: OffersReviewProps) {
   });
   const searchInitializedRef = useRef(false);
   const latestRequestIdRef = useRef(0);
+  const latestDetailRequestIdRef = useRef(0);
 
   const selectedCompany = useMemo(
     () =>
@@ -239,12 +240,19 @@ export function OffersReview({ initialList, companies }: OffersReviewProps) {
   }
 
   async function openDetailModal(offer: OfferListItem) {
+    const requestId = latestDetailRequestIdRef.current + 1;
+    latestDetailRequestIdRef.current = requestId;
     setDetailFallback(offer);
     setDetailData(null);
     setIsDetailModalOpen(true);
     setIsDetailLoading(true);
 
     const result = await getOfferDetail(offer.offer_id);
+
+    if (requestId !== latestDetailRequestIdRef.current) {
+      return;
+    }
+
     setIsDetailLoading(false);
 
     if (!result.ok || !result.data) {
@@ -254,6 +262,11 @@ export function OffersReview({ initialList, companies }: OffersReviewProps) {
         text: result.message,
         confirmButtonColor: "#0f3d78",
       });
+      return;
+    }
+
+    if (result.data.offer_id !== offer.offer_id) {
+      setDetailData(null);
       return;
     }
 
@@ -745,7 +758,8 @@ export function OffersReview({ initialList, companies }: OffersReviewProps) {
                 <p className="text-sm font-medium text-[var(--text-primary)]">
                   Imagenes de la oferta
                 </p>
-                {detailData?.images.length ? (
+                {detailData?.offer_id === detailFallback.offer_id &&
+                detailData.images.length ? (
                   <div className="mt-3 grid gap-3 sm:grid-cols-2">
                     {detailData.images.map((image) => (
                       <figure
