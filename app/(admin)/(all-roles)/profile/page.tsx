@@ -24,7 +24,7 @@ export default async function ProfilePage() {
           <form action={logoutAction}>
             <button
               type="submit"
-              className="rounded-xl border border-[var(--border)] px-4 py-2.5 text-sm font-medium text-[var(--text-primary)] transition hover:bg-[var(--accent-soft)]"
+              className="rounded-xl bg-red-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-red-700"
             >
               Cerrar sesión
             </button>
@@ -32,7 +32,7 @@ export default async function ProfilePage() {
         </div>
       </header>
 
-      <div className="grid gap-6 xl:grid-cols-[1.4fr_0.9fr]">
+      <div className="grid gap-6 ">
         <article className="rounded-2xl border border-[var(--border)] bg-white p-6 shadow-sm">
           <div className="mb-6 flex items-start gap-4">
             <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[var(--accent-soft)] text-base font-semibold text-[var(--brand-blue)]">
@@ -60,18 +60,6 @@ export default async function ProfilePage() {
             }}
           />
         </article>
-
-        <aside className="space-y-6">
-          <div className="rounded-2xl border border-[var(--border)] bg-white p-6 shadow-sm">
-            <h2 className="text-base font-semibold text-[var(--text-primary)]">
-              Información de cuenta
-            </h2>
-            <p className="mt-2 text-sm text-[var(--text-muted)]">
-              Desde aquí puedes modificar tus datos personales. El rol y la
-              empresa asociada se muestran como referencia.
-            </p>
-          </div>
-        </aside>
       </div>
     </section>
   );

@@ -1,14 +1,23 @@
+import RecoverPasswordForm from "./recover-password-form";
+
 export default function RecoverPasswordPage() {
   return (
-    <main className="grid min-h-screen place-items-center p-4">
-      <section className="w-full max-w-md rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-7 shadow-[0_8px_18px_-14px_rgba(15,23,42,0.26)]">
-        <h1 className="text-2xl font-semibold tracking-tight text-[var(--text-primary)]">
-          Restablecer Contrasena
-        </h1>
-        <p className="mt-2 text-sm text-[var(--text-muted)]">
-          Ruta base preparada para validar token y registrar nueva contrasena.
+    <section className="mx-auto max-w-md space-y-6">
+      <header className="space-y-2">
+        <p className="text-sm font-medium text-[var(--brand-blue)]">
+          Recuperación de acceso
         </p>
-      </section>
-    </main>
+        <h1 className="text-2xl font-semibold tracking-tight text-[var(--text-primary)]">
+          Nueva contraseña
+        </h1>
+        <p className="text-sm text-[var(--text-muted)]">
+          Ingresa tu nueva contraseña para recuperar el acceso a tu cuenta.
+        </p>
+      </header>
+
+      <div className="rounded-2xl border border-[var(--border)] bg-white p-6 shadow-sm">
+        <RecoverPasswordForm />
+      </div>
+    </section>
   );
 }

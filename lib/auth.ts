@@ -77,7 +77,8 @@ export async function requireAdminProfile() {
 
   if (
     profile.user_role !== "ADMIN_PLATFORM" &&
-    profile.user_role !== "ADMIN_COMPANY"
+    profile.user_role !== "ADMIN_COMPANY" &&
+    profile.user_role !== "EMPLOYEE"
   ) {
     redirect("/auth/login?error=unauthorized");
   }
