@@ -81,11 +81,6 @@ export const NAV_SECTIONS: NavSection[] = [
     roles: ["ADMIN_COMPANY"],
     items: [
       {
-        href: "/dashboard",
-        label: "Dashboard",
-        icon: "dashboard",
-      },
-      {
         href: "/company-offers",
         label: "Mis ofertas",
         icon: "ticket",
@@ -101,11 +96,6 @@ export const NAV_SECTIONS: NavSection[] = [
     title: "Empleado Empresa",
     roles: ["EMPLOYEE"],
     items: [
-      {
-        href: "/dashboard",
-        label: "Dashboard",
-        icon: "dashboard",
-      },
       {
         href: "/coupon-redemption",
         label: "Canje de cupón",

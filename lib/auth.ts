@@ -90,7 +90,7 @@ export async function requireRole(allowedRoles: AppRole[]) {
   const profile = await requireAdminProfile();
 
   if (!allowedRoles.includes(profile.user_role)) {
-    redirect("/dashboard");
+    redirect("/profile");
   }
 
   return profile;
