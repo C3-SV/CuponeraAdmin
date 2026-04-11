@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { createClient } from "@/lib/supabase/client";
 
 type CustomerStatus = "activa" | "inactiva";
 type CouponStatus = "disponible" | "canjeado" | "vencido";
@@ -8,7 +9,6 @@ type CouponStatus = "disponible" | "canjeado" | "vencido";
 type Customer = {
   id: string;
   nombreCompleto: string;
-  correo: string;
   telefono: string;
   dui: string;
   direccion: string;
@@ -25,130 +25,52 @@ type CustomerCoupon = {
   estado: CouponStatus;
 };
 
-const mockCustomers: Customer[] = [
-  {
-    id: "CLI-001",
-    nombreCompleto: "Andrea Perez",
-    correo: "andrea.perez@mail.com",
-    telefono: "+503 7012-3301",
-    dui: "04561234-8",
-    direccion: "Colonia Escalon, San Salvador",
-    fechaRegistro: "2026-02-10",
-    estadoCuenta: "activa",
-  },
-  {
-    id: "CLI-002",
-    nombreCompleto: "Carlos Rodriguez",
-    correo: "carlos.rodriguez@mail.com",
-    telefono: "+503 7820-4418",
-    dui: "03894567-2",
-    direccion: "Santa Tecla, La Libertad",
-    fechaRegistro: "2026-01-18",
-    estadoCuenta: "inactiva",
-  },
-  {
-    id: "CLI-003",
-    nombreCompleto: "Daniela Molina",
-    correo: "daniela.molina@mail.com",
-    telefono: "+503 7953-1820",
-    dui: "05127893-4",
-    direccion: "Soyapango, San Salvador",
-    fechaRegistro: "2026-03-02",
-    estadoCuenta: "activa",
-  },
-  {
-    id: "CLI-004",
-    nombreCompleto: "Fernando Rivera",
-    correo: "fernando.rivera@mail.com",
-    telefono: "+503 7114-9055",
-    dui: "06348952-1",
-    direccion: "San Miguel, San Miguel",
-    fechaRegistro: "2025-12-22",
-    estadoCuenta: "activa",
-  },
-];
+type CustomerProfileRow = {
+  user_id: string;
+  dui: string | null;
+  address: string | null;
+  phone: string | null;
+  created_at: string;
+  deleted_at: string | null;
+};
 
-const mockCouponsByCustomer: Record<string, CustomerCoupon[]> = {
-  "CLI-001": [
-    {
-      id: "CP-9001",
-      tituloOferta: "2x1 en Pizza Familiar",
-      codigo: "PZZA-22A1",
-      fechaCompra: "2026-03-20",
-      fechaExpiracion: "2026-04-20",
-      estado: "disponible",
-    },
-    {
-      id: "CP-9002",
-      tituloOferta: "Descuento Spa 40%",
-      codigo: "SPA-19K0",
-      fechaCompra: "2026-02-15",
-      fechaExpiracion: "2026-03-15",
-      estado: "canjeado",
-    },
-    {
-      id: "CP-9003",
-      tituloOferta: "Combo Sushi Premium",
-      codigo: "SSHI-73B4",
-      fechaCompra: "2026-01-10",
-      fechaExpiracion: "2026-02-10",
-      estado: "vencido",
-    },
-  ],
-  "CLI-002": [
-    {
-      id: "CP-9010",
-      tituloOferta: "Lavado Full de Vehiculo",
-      codigo: "AUTO-10Q1",
-      fechaCompra: "2026-03-01",
-      fechaExpiracion: "2026-04-01",
-      estado: "disponible",
-    },
-    {
-      id: "CP-9011",
-      tituloOferta: "Hamburguesa Artesanal",
-      codigo: "BURG-67L2",
-      fechaCompra: "2026-01-08",
-      fechaExpiracion: "2026-02-08",
-      estado: "vencido",
-    },
-  ],
-  "CLI-003": [
-    {
-      id: "CP-9020",
-      tituloOferta: "Entrada Cine + Palomitas",
-      codigo: "CINE-80R4",
-      fechaCompra: "2026-03-12",
-      fechaExpiracion: "2026-04-12",
-      estado: "disponible",
-    },
-    {
-      id: "CP-9021",
-      tituloOferta: "Menu Ejecutivo",
-      codigo: "MNU-55X8",
-      fechaCompra: "2026-03-05",
-      fechaExpiracion: "2026-04-05",
-      estado: "canjeado",
-    },
-  ],
-  "CLI-004": [
-    {
-      id: "CP-9030",
-      tituloOferta: "Pase de Gimnasio Mensual",
-      codigo: "GYM-11P9",
-      fechaCompra: "2026-02-03",
-      fechaExpiracion: "2026-03-03",
-      estado: "vencido",
-    },
-    {
-      id: "CP-9031",
-      tituloOferta: "Mantenimiento Preventivo",
-      codigo: "CAR-88T3",
-      fechaCompra: "2026-03-21",
-      fechaExpiracion: "2026-04-21",
-      estado: "disponible",
-    },
-  ],
+type ProfileRow = {
+  user_id: string;
+  first_names: string | null;
+  last_names: string | null;
+  user_is_active: boolean | null;
+  created_at?: string | null;
+};
+
+type OrderRow = {
+  order_id: string;
+  customer_id: string;
+  order_status: string;
+  deleted_at: string | null;
+};
+
+type OrderItemRow = {
+  order_item_id: string;
+  order_id: string;
+  offer_id: string;
+  created_at: string;
+  deleted_at: string | null;
+};
+
+type OfferRow = {
+  offer_id: string;
+  offer_title: string;
+};
+
+type CouponRow = {
+  coupon_id: string;
+  order_item_id: string;
+  coupon_code: string;
+  coupon_issued_at: string;
+  coupon_expires_at: string;
+  coupon_redeemed_at: string | null;
+  coupon_status: string;
+  deleted_at: string | null;
 };
 
 function getStatusStyles(status: CustomerStatus): string {
@@ -186,14 +108,193 @@ function getCouponsByState(
   return coupons.filter((coupon) => coupon.estado === status);
 }
 
+function normalizeCouponStatus(coupon: CouponRow): CouponStatus {
+  if (coupon.coupon_status === "REDEEMED" || coupon.coupon_redeemed_at) {
+    return "canjeado";
+  }
+
+  const expirationTime = new Date(coupon.coupon_expires_at).getTime();
+  if (!Number.isNaN(expirationTime) && expirationTime < Date.now()) {
+    return "vencido";
+  }
+
+  return "disponible";
+}
+
+function buildCustomerName(profile?: ProfileRow): string {
+  if (!profile) {
+    return "Cliente";
+  }
+
+  const first = profile.first_names?.trim() ?? "";
+  const last = profile.last_names?.trim() ?? "";
+  const full = `${first} ${last}`.trim();
+
+  return full || "Cliente";
+}
+
 export default function CustomersPage() {
-  const [customers] = useState<Customer[]>(mockCustomers);
-  const [couponsByCustomer] = useState<Record<string, CustomerCoupon[]>>(
-    mockCouponsByCustomer,
-  );
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [couponsByCustomer, setCouponsByCustomer] = useState<
+    Record<string, CustomerCoupon[]>
+  >({});
+  const [loadingData, setLoadingData] = useState(true);
+  const [loadingError, setLoadingError] = useState<string | null>(null);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [detailModalOpen, setDetailModalOpen] = useState(false);
   const [couponModalOpen, setCouponModalOpen] = useState(false);
+
+  async function loadCustomersAndCoupons() {
+    setLoadingData(true);
+    setLoadingError(null);
+
+    try {
+      const supabase = createClient();
+
+      const [
+        customerProfileResult,
+        ordersResult,
+        orderItemsResult,
+        offersResult,
+        couponsResult,
+        profilesResult,
+      ] = await Promise.all([
+        supabase
+          .from("customer_profile")
+          .select("user_id, dui, address, phone, created_at, deleted_at")
+          .is("deleted_at", null),
+        supabase
+          .from("orders")
+          .select("order_id, customer_id, order_status, deleted_at")
+          .is("deleted_at", null)
+          .eq("order_status", "COMPLETED"),
+        supabase
+          .from("order_items")
+          .select("order_item_id, order_id, offer_id, created_at, deleted_at")
+          .is("deleted_at", null),
+        supabase.from("offers").select("offer_id, offer_title"),
+        supabase
+          .from("coupons")
+          .select(
+            "coupon_id, order_item_id, coupon_code, coupon_issued_at, coupon_expires_at, coupon_redeemed_at, coupon_status, deleted_at",
+          )
+          .is("deleted_at", null),
+        supabase
+          .from("profiles")
+          .select("user_id, first_names, last_names, user_is_active, created_at"),
+      ]);
+
+      if (
+        customerProfileResult.error ||
+        ordersResult.error ||
+        orderItemsResult.error ||
+        offersResult.error ||
+        couponsResult.error ||
+        profilesResult.error
+      ) {
+        throw new Error(
+          customerProfileResult.error?.message ||
+            ordersResult.error?.message ||
+            orderItemsResult.error?.message ||
+            offersResult.error?.message ||
+            couponsResult.error?.message ||
+            profilesResult.error?.message ||
+            "No se pudo cargar datos de clientes y cupones.",
+        );
+      }
+
+      const customerProfiles = (customerProfileResult.data ?? []) as CustomerProfileRow[];
+      const orders = (ordersResult.data ?? []) as OrderRow[];
+      const orderItems = (orderItemsResult.data ?? []) as OrderItemRow[];
+      const offers = (offersResult.data ?? []) as OfferRow[];
+      const coupons = (couponsResult.data ?? []) as CouponRow[];
+      const profiles = (profilesResult.data ?? []) as ProfileRow[];
+
+      const customerProfileMap = new Map(
+        customerProfiles.map((row) => [row.user_id, row]),
+      );
+      const orderMap = new Map(orders.map((row) => [row.order_id, row]));
+      const orderItemMap = new Map(orderItems.map((row) => [row.order_item_id, row]));
+      const offerMap = new Map(offers.map((row) => [row.offer_id, row]));
+      const profileMap = new Map(profiles.map((row) => [row.user_id, row]));
+
+      const nextCouponsByCustomer: Record<string, CustomerCoupon[]> = {};
+
+      for (const coupon of coupons) {
+        const orderItem = orderItemMap.get(coupon.order_item_id);
+        if (!orderItem) {
+          continue;
+        }
+
+        const order = orderMap.get(orderItem.order_id);
+        if (!order) {
+          continue;
+        }
+
+        const customerId = order.customer_id;
+        const offerTitle = offerMap.get(orderItem.offer_id)?.offer_title ?? coupon.coupon_code;
+
+        if (!nextCouponsByCustomer[customerId]) {
+          nextCouponsByCustomer[customerId] = [];
+        }
+
+        nextCouponsByCustomer[customerId].push({
+          id: coupon.coupon_id,
+          tituloOferta: offerTitle,
+          codigo: coupon.coupon_code,
+          fechaCompra: coupon.coupon_issued_at || orderItem.created_at,
+          fechaExpiracion: coupon.coupon_expires_at,
+          estado: normalizeCouponStatus(coupon),
+        });
+      }
+
+      const userIds = new Set<string>([
+        ...customerProfiles.map((row) => row.user_id),
+        ...Object.keys(nextCouponsByCustomer),
+      ]);
+
+      const nextCustomers: Customer[] = Array.from(userIds).map((userId) => {
+        const profile = profileMap.get(userId);
+        const customerProfile = customerProfileMap.get(userId);
+
+        return {
+          id: userId,
+          nombreCompleto: buildCustomerName(profile),
+          telefono: customerProfile?.phone?.trim() || "-",
+          dui: customerProfile?.dui?.trim() || "-",
+          direccion: customerProfile?.address?.trim() || "-",
+          fechaRegistro:
+            customerProfile?.created_at ||
+            profile?.created_at ||
+            new Date().toISOString(),
+          estadoCuenta: profile?.user_is_active === false ? "inactiva" : "activa",
+        };
+      });
+
+      nextCustomers.sort((a, b) => a.nombreCompleto.localeCompare(b.nombreCompleto));
+
+      setCustomers(nextCustomers);
+      setCouponsByCustomer(nextCouponsByCustomer);
+    } catch (error) {
+      setLoadingError(
+        error instanceof Error ? error.message : "No fue posible cargar datos.",
+      );
+    } finally {
+      setLoadingData(false);
+    }
+  }
+
+  useEffect(() => {
+    loadCustomersAndCoupons();
+  }, []);
+
+  useEffect(() => {
+    if (!couponModalOpen) {
+      return;
+    }
+
+    void loadCustomersAndCoupons();
+  }, [couponModalOpen]);
 
   const selectedCustomerCoupons = useMemo(() => {
     if (!selectedCustomer) {
@@ -250,6 +351,10 @@ export default function CustomersPage() {
     setCouponModalOpen(true);
   }
 
+  function refreshCustomers() {
+    void loadCustomersAndCoupons();
+  }
+
   function closeDetailModal() {
     setDetailModalOpen(false);
   }
@@ -268,6 +373,9 @@ export default function CustomersPage() {
           <p className="text-sm text-(--text-muted)">
             Gestiona detalle de cliente y consulta cupones por estado.
           </p>
+          {loadingError ? (
+            <p className="text-sm text-red-600">Error de carga: {loadingError}</p>
+          ) : null}
         </div>
 
         <div className="overflow-x-auto rounded-2xl border border-(--border)">
@@ -292,7 +400,18 @@ export default function CustomersPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-(--border) bg-(--surface)">
-              {customers.length === 0 ? (
+              {loadingData ? (
+                <tr>
+                  <td
+                    colSpan={5}
+                    className="px-4 py-6 text-center text-sm text-(--text-muted)"
+                  >
+                    Cargando clientes desde la base de datos...
+                  </td>
+                </tr>
+              ) : null}
+
+              {!loadingData && customers.length === 0 ? (
                 <tr>
                   <td
                     colSpan={5}
@@ -312,7 +431,6 @@ export default function CustomersPage() {
                     <p className="text-xs text-(--text-muted)">{customer.id}</p>
                   </td>
                   <td className="px-4 py-3">
-                    <p className="text-sm text-foreground">{customer.correo}</p>
                     <p className="text-xs text-(--text-muted)">{customer.telefono}</p>
                   </td>
                   <td className="px-4 py-3 text-sm text-foreground">
@@ -401,9 +519,6 @@ export default function CustomersPage() {
                 </p>
                 <div className="grid gap-3 sm:grid-cols-2">
                   <p className="text-sm text-foreground">
-                    <span className="font-medium">Correo:</span> {selectedCustomer.correo}
-                  </p>
-                  <p className="text-sm text-foreground">
                     <span className="font-medium">Telefono:</span>{" "}
                     {selectedCustomer.telefono}
                   </p>
@@ -458,13 +573,22 @@ export default function CustomersPage() {
                   {selectedCustomer.nombreCompleto} · {selectedCustomer.id}
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={closeCouponModal}
-                className="rounded-lg border border-(--border) px-2.5 py-1.5 text-sm text-(--text-muted) hover:bg-(--surface-soft)"
-              >
-                Cerrar
-              </button>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={refreshCustomers}
+                  className="rounded-lg border border-(--border) px-2.5 py-1.5 text-sm text-(--text-muted) hover:bg-(--surface-soft)"
+                >
+                  Actualizar
+                </button>
+                <button
+                  type="button"
+                  onClick={closeCouponModal}
+                  className="rounded-lg border border-(--border) px-2.5 py-1.5 text-sm text-(--text-muted) hover:bg-(--surface-soft)"
+                >
+                  Cerrar
+                </button>
+              </div>
             </header>
 
             <div className="grid gap-4 lg:grid-cols-3">
