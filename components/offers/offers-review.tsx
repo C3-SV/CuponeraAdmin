@@ -68,7 +68,7 @@ function formatDateTime(value: string): string {
 }
 
 function getStateLabel(offer: OfferListItem): string {
-  if (offer.deleted_at) {
+  if (offer.offer_status === "DISCARDED") {
     return "Descartada";
   }
 
@@ -94,7 +94,7 @@ function getStateLabel(offer: OfferListItem): string {
 }
 
 function getStateStyles(offer: OfferListItem): string {
-  if (offer.deleted_at) {
+  if (offer.offer_status === "DISCARDED") {
     return "bg-slate-100 text-slate-700";
   }
 
@@ -256,7 +256,10 @@ export function OffersReview({ initialList, companies }: OffersReviewProps) {
       return;
     }
 
-    const result = await approveOffer(offer.offer_id, String(confirmation.value ?? ""));
+    const result = await approveOffer(
+      offer.offer_id,
+      String(confirmation.value ?? ""),
+    );
 
     if (!result.ok) {
       await Swal.fire({
@@ -561,7 +564,8 @@ export function OffersReview({ initialList, companies }: OffersReviewProps) {
                           >
                             Detalle
                           </button>
-                          {!offer.deleted_at ? (
+
+                          {offer.offer_status !== "DISCARDED" ? (
                             <>
                               <button
                                 type="button"
