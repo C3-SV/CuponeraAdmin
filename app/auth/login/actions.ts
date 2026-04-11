@@ -60,7 +60,8 @@ export async function loginAction(
 
     if (
         profile.user_role !== "ADMIN_PLATFORM" &&
-        profile.user_role !== "ADMIN_COMPANY"
+        profile.user_role !== "ADMIN_COMPANY" &&
+        profile.user_role !== "EMPLOYEE"
     ) {
         await supabase.auth.signOut();
         return { error: "No tienes acceso al panel administrativo" };
@@ -68,6 +69,14 @@ export async function loginAction(
 
     if (profile.user_role === "ADMIN_PLATFORM") {
         redirect("/dashboard");
+    }
+
+    if (profile.user_role === "ADMIN_COMPANY") {
+        redirect("/company-offers");
+    }
+
+    if (profile.user_role === "EMPLOYEE") {
+        redirect("/coupon-redemption");
     }
 
     redirect("/profile");
