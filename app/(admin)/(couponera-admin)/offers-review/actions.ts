@@ -6,9 +6,13 @@ import { createClient } from "@/lib/supabase/server";
 import type {
   OfferActionResult,
   OfferCompanyOption,
+  OfferDetail,
+  OfferImage,
   OfferListItem,
+  OfferOrderDetail,
   OfferQueryParams,
   OffersListResponse,
+  OfferListDetail,
 } from "@/lib/offers/types";
 
 type OfferCompanyRelation =
@@ -36,6 +40,47 @@ type OfferRow = {
   deleted_at: string | null;
   companies: OfferCompanyRelation;
 };
+
+type OfferImageRow = {
+  offer_carousel_image_id: string;
+  image_url: string;
+  image_alt_text: string | null;
+  image_sort_order: number;
+  main_image: boolean;
+};
+
+type OfferListDetailRow = {
+  offer_list_detail_id: string;
+  item_title: string;
+  item_description: string;
+  item_sort_order: number;
+};
+
+type OfferOrderRelation =
+  | {
+      order_id: string;
+      order_payment_ref: string | null;
+      order_paid_at: string | null;
+      order_status: string;
+    }
+  | {
+      order_id: string;
+      order_payment_ref: string | null;
+      order_paid_at: string | null;
+      order_status: string;
+    }[]
+  | null;
+
+type OfferOrderItemRow = {
+  order_item_id: string;
+  order_id: string | null;
+  quantity: number | string;
+  unit_price: number | string;
+  created_at: string;
+  orders: OfferOrderRelation;
+};
+
+type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
 
 const DEFAULT_QUERY: OfferQueryParams = {
   search: "",
@@ -113,6 +158,73 @@ function toOfferListItem(row: OfferRow): OfferListItem {
     created_at: row.created_at,
     updated_at: row.updated_at,
     deleted_at: row.deleted_at,
+  };
+}
+
+function buildOfferImageUrl(
+  supabase: SupabaseServerClient,
+  imageUrl: string,
+): string {
+  if (imageUrl.startsWith("http://") || imageUrl.startsWith("https://")) {
+    return imageUrl;
+  }
+
+  const normalizedPath = imageUrl.replace(/^product-images\//, "");
+
+  return supabase.storage
+    .from("product-images")
+    .getPublicUrl(normalizedPath).data.publicUrl;
+}
+
+function toOfferImage(
+  row: OfferImageRow,
+  supabase: SupabaseServerClient,
+): OfferImage {
+  return {
+    offer_carousel_image_id: row.offer_carousel_image_id,
+    image_url: buildOfferImageUrl(supabase, row.image_url),
+    image_alt_text: row.image_alt_text,
+    image_sort_order: Number(row.image_sort_order),
+    main_image: row.main_image,
+  };
+}
+
+function hasUsableImageUrl(row: OfferImageRow): boolean {
+  return row.image_url.trim().length > 0;
+}
+
+function toOfferListDetail(row: OfferListDetailRow): OfferListDetail {
+  return {
+    offer_list_detail_id: row.offer_list_detail_id,
+    item_title: row.item_title,
+    item_description: row.item_description,
+    item_sort_order: Number(row.item_sort_order),
+  };
+}
+
+function getOrderRelation(row: OfferOrderItemRow) {
+  if (!row.orders) {
+    return null;
+  }
+
+  return Array.isArray(row.orders) ? row.orders[0] ?? null : row.orders;
+}
+
+function toOfferOrderDetail(row: OfferOrderItemRow): OfferOrderDetail {
+  const order = getOrderRelation(row);
+  const quantity = Number(row.quantity);
+  const unitPrice = Number(row.unit_price);
+
+  return {
+    order_item_id: row.order_item_id,
+    order_id: order?.order_id ?? row.order_id,
+    order_status: order?.order_status ?? "Sin estado",
+    order_paid_at: order?.order_paid_at ?? null,
+    order_payment_ref: order?.order_payment_ref ?? null,
+    quantity,
+    unit_price: unitPrice,
+    subtotal: quantity * unitPrice,
+    created_at: row.created_at,
   };
 }
 
@@ -245,6 +357,92 @@ export async function listOffers(
       pageSize,
       error:
         error instanceof Error ? error.message : "No fue posible cargar ofertas.",
+    };
+  }
+}
+
+export async function getOfferDetail(
+  offerId: string,
+): Promise<OfferActionResult<OfferDetail>> {
+  try {
+    await requireCouponeraAdmin();
+
+    const supabase = await createClient();
+    const { data: offer, error: offerError } = await supabase
+      .from("offers")
+      .select(
+        "offer_id, offer_title, offer_description, offer_regular_price, offer_price, offer_start_date, offer_end_date, coupon_usage_deadline, coupon_quantity_limit, offer_status, offer_rejection_reason, reviewed_by, reviewed_at, company_id, created_at, updated_at, deleted_at, companies(company_id, company_name)",
+      )
+      .eq("offer_id", offerId)
+      .single();
+
+    if (offerError || !offer) {
+      return {
+        ok: false,
+        message: offerError?.message ?? "No fue posible cargar la oferta.",
+      };
+    }
+
+    const [imagesResult, listDetailsResult, orderDetailsResult] =
+      await Promise.all([
+        supabase
+          .from("offer_carousel_images")
+          .select(
+            "offer_carousel_image_id, image_url, image_alt_text, image_sort_order, main_image",
+          )
+          .eq("offer_id", offerId)
+          .is("deleted_at", null)
+          .order("main_image", { ascending: false })
+          .order("image_sort_order", { ascending: true }),
+        supabase
+          .from("offer_list_details")
+          .select(
+            "offer_list_detail_id, item_title, item_description, item_sort_order",
+          )
+          .eq("offer_id", offerId)
+          .is("deleted_at", null)
+          .order("item_sort_order", { ascending: true }),
+        supabase
+          .from("order_items")
+          .select(
+            "order_item_id, order_id, quantity, unit_price, created_at, orders(order_id, order_payment_ref, order_paid_at, order_status)",
+          )
+          .eq("offer_id", offerId)
+          .is("deleted_at", null)
+          .order("created_at", { ascending: false }),
+      ]);
+
+    const detail: OfferDetail = {
+      ...toOfferListItem(offer as OfferRow),
+      images: imagesResult.error
+        ? []
+        : ((imagesResult.data ?? []) as OfferImageRow[])
+            .filter(hasUsableImageUrl)
+            .map((image) => toOfferImage(image, supabase)),
+      list_details: listDetailsResult.error
+        ? []
+        : ((listDetailsResult.data ?? []) as OfferListDetailRow[]).map(
+            toOfferListDetail,
+          ),
+      order_details: orderDetailsResult.error
+        ? []
+        : ((orderDetailsResult.data ?? []) as OfferOrderItemRow[]).map(
+            toOfferOrderDetail,
+          ),
+    };
+
+    return {
+      ok: true,
+      message: "Detalle cargado.",
+      data: detail,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      message:
+        error instanceof Error
+          ? error.message
+          : "No fue posible cargar el detalle de la oferta.",
     };
   }
 }

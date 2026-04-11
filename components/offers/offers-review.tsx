@@ -1,15 +1,18 @@
 "use client";
 
+import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Swal from "sweetalert2";
 import {
   approveOffer,
   discardOffer,
+  getOfferDetail,
   listOffers,
   rejectOffer,
 } from "@/app/(admin)/(couponera-admin)/offers-review/actions";
 import type {
   OfferCompanyOption,
+  OfferDetail,
   OfferListItem,
   OfferQueryParams,
   OfferSortBy,
@@ -139,7 +142,10 @@ export function OffersReview({ initialList, companies }: OffersReviewProps) {
     initialList.error ?? null,
   );
   const [isTableLoading, setIsTableLoading] = useState(false);
-  const [selectedOffer, setSelectedOffer] = useState<OfferListItem | null>(null);
+  const [detailData, setDetailData] = useState<OfferDetail | null>(null);
+  const [detailFallback, setDetailFallback] = useState<OfferListItem | null>(null);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [isDetailLoading, setIsDetailLoading] = useState(false);
 
   const queryRef = useRef<OfferQueryParams>({
     ...DEFAULT_QUERY,
@@ -148,6 +154,7 @@ export function OffersReview({ initialList, companies }: OffersReviewProps) {
   });
   const searchInitializedRef = useRef(false);
   const latestRequestIdRef = useRef(0);
+  const latestDetailRequestIdRef = useRef(0);
 
   const selectedCompany = useMemo(
     () =>
@@ -220,7 +227,7 @@ export function OffersReview({ initialList, companies }: OffersReviewProps) {
   useEffect(() => {
     function onEscape(event: KeyboardEvent) {
       if (event.key === "Escape") {
-        setSelectedOffer(null);
+        setIsDetailModalOpen(false);
       }
     }
 
@@ -230,6 +237,40 @@ export function OffersReview({ initialList, companies }: OffersReviewProps) {
 
   async function refreshCurrentList() {
     await loadOfferList(queryRef.current);
+  }
+
+  async function openDetailModal(offer: OfferListItem) {
+    const requestId = latestDetailRequestIdRef.current + 1;
+    latestDetailRequestIdRef.current = requestId;
+    setDetailFallback(offer);
+    setDetailData(null);
+    setIsDetailModalOpen(true);
+    setIsDetailLoading(true);
+
+    const result = await getOfferDetail(offer.offer_id);
+
+    if (requestId !== latestDetailRequestIdRef.current) {
+      return;
+    }
+
+    setIsDetailLoading(false);
+
+    if (!result.ok || !result.data) {
+      await Swal.fire({
+        icon: "error",
+        title: "No se pudo cargar el detalle",
+        text: result.message,
+        confirmButtonColor: "#0f3d78",
+      });
+      return;
+    }
+
+    if (result.data.offer_id !== offer.offer_id) {
+      setDetailData(null);
+      return;
+    }
+
+    setDetailData(result.data);
   }
 
   async function handleSort(sortBy: OfferSortBy) {
@@ -469,7 +510,6 @@ export function OffersReview({ initialList, companies }: OffersReviewProps) {
                   ["offer_price", "Precio"],
                   ["offer_start_date", "Inicio"],
                   ["offer_end_date", "Fin"],
-                  ["created_at", "Creada"],
                 ].map(([field, label]) => (
                   <th
                     key={field}
@@ -500,7 +540,7 @@ export function OffersReview({ initialList, companies }: OffersReviewProps) {
               {isTableLoading ? (
                 <tr>
                   <td
-                    colSpan={8}
+                    colSpan={7}
                     className="px-4 py-6 text-center text-sm text-[var(--text-muted)]"
                   >
                     Cargando ofertas...
@@ -511,7 +551,7 @@ export function OffersReview({ initialList, companies }: OffersReviewProps) {
               {!isTableLoading && listResult.data.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={8}
+                    colSpan={7}
                     className="px-4 py-6 text-center text-sm text-[var(--text-muted)]"
                   >
                     No hay ofertas para mostrar.
@@ -543,9 +583,6 @@ export function OffersReview({ initialList, companies }: OffersReviewProps) {
                       <td className="px-4 py-3 text-center text-sm text-[var(--text-muted)]">
                         {formatDate(offer.offer_end_date)}
                       </td>
-                      <td className="px-4 py-3 text-center text-sm text-[var(--text-muted)]">
-                        {formatDateTime(offer.created_at)}
-                      </td>
                       <td className="px-4 py-3 text-center">
                         <span
                           className={`inline-flex rounded-lg px-2 py-1 text-xs font-medium ${getStateStyles(
@@ -557,56 +594,42 @@ export function OffersReview({ initialList, companies }: OffersReviewProps) {
                       </td>
                       <td className="px-4 py-3">
                         {(() => {
-                          const isApproved = offer.offer_status === "APPROVED";
-                          const isRejected = offer.offer_status === "REJECTED";
-                          const isDiscarded = offer.offer_status === "DISCARDED";
-
-                          const showApprove = !isApproved && !isDiscarded;
-                          const showReject = !isRejected && !isDiscarded;
-                          const showDiscard = !isDiscarded;
-
                           const buttonBaseClass =
                             "w-full rounded-lg px-2 py-1.5 text-[11px] font-medium leading-none whitespace-nowrap";
 
                           return (
-                            <div className="mx-auto flex w-[110px] flex-col gap-2">
+                            <div className="mx-auto grid w-[184px] grid-cols-2 gap-2">
                               <button
                                 type="button"
-                                onClick={() => setSelectedOffer(offer)}
+                                onClick={() => void openDetailModal(offer)}
                                 className={`${buttonBaseClass} border border-[var(--border)] text-[var(--text-primary)] hover:bg-[var(--surface-soft)]`}
                               >
                                 Detalle
                               </button>
 
-                              {showApprove ? (
-                                <button
-                                  type="button"
-                                  onClick={() => void handleApproveOffer(offer)}
-                                  className={`${buttonBaseClass} bg-green-600 text-white hover:bg-green-700`}
-                                >
-                                  Aprobar
-                                </button>
-                              ) : null}
+                              <button
+                                type="button"
+                                onClick={() => void handleApproveOffer(offer)}
+                                className={`${buttonBaseClass} bg-green-600 text-white hover:bg-green-700`}
+                              >
+                                Aprobar
+                              </button>
 
-                              {showReject ? (
-                                <button
-                                  type="button"
-                                  onClick={() => void handleRejectOffer(offer)}
-                                  className={`${buttonBaseClass} bg-red-600 text-white hover:bg-red-700`}
-                                >
-                                  Rechazar
-                                </button>
-                              ) : null}
+                              <button
+                                type="button"
+                                onClick={() => void handleRejectOffer(offer)}
+                                className={`${buttonBaseClass} bg-red-600 text-white hover:bg-red-700`}
+                              >
+                                Rechazar
+                              </button>
 
-                              {showDiscard ? (
-                                <button
-                                  type="button"
-                                  onClick={() => void handleDiscardOffer(offer)}
-                                  className={`${buttonBaseClass} bg-[var(--brand-orange)] text-white hover:bg-[var(--brand-orange-strong)]`}
-                                >
-                                  Descartar
-                                </button>
-                              ) : null}
+                              <button
+                                type="button"
+                                onClick={() => void handleDiscardOffer(offer)}
+                                className={`${buttonBaseClass} bg-[var(--brand-orange)] text-white hover:bg-[var(--brand-orange-strong)]`}
+                              >
+                                Descartar
+                              </button>
                             </div>
                           );
                         })()}
@@ -650,27 +673,27 @@ export function OffersReview({ initialList, companies }: OffersReviewProps) {
         </div>
       </section>
 
-      {selectedOffer ? (
+      {isDetailModalOpen && detailFallback ? (
         <div className="fixed inset-0 z-40 grid place-items-center p-4">
           <button
             type="button"
-            onClick={() => setSelectedOffer(null)}
+            onClick={() => setIsDetailModalOpen(false)}
             aria-label="Cerrar detalle de oferta"
             className="absolute inset-0 bg-[#0f2749]/45"
           />
-          <section className="relative z-10 w-full max-w-2xl rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[0_18px_36px_-22px_rgba(15,23,42,0.35)] lg:p-6">
+          <section className="relative z-10 max-h-[calc(100vh-3rem)] w-full max-w-2xl overflow-y-auto rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[0_18px_36px_-22px_rgba(15,23,42,0.35)] lg:p-6">
             <header className="mb-4 flex items-start justify-between gap-4 border-b border-[var(--border)] pb-4">
               <div>
                 <h2 className="text-xl font-semibold text-[var(--text-primary)]">
-                  {selectedOffer.offer_title}
+                  {(detailData ?? detailFallback).offer_title}
                 </h2>
                 <p className="text-sm text-[var(--text-muted)]">
-                  {selectedOffer.company_name}
+                  {(detailData ?? detailFallback).company_name}
                 </p>
               </div>
               <button
                 type="button"
-                onClick={() => setSelectedOffer(null)}
+                onClick={() => setIsDetailModalOpen(false)}
                 className="rounded-lg border border-[var(--border)] px-2.5 py-1.5 text-sm text-[var(--text-muted)] hover:bg-[var(--surface-soft)]"
               >
                 Cerrar
@@ -678,9 +701,15 @@ export function OffersReview({ initialList, companies }: OffersReviewProps) {
             </header>
 
             <div className="space-y-4">
+              {isDetailLoading ? (
+                <p className="text-sm text-[var(--text-muted)]">
+                  Cargando detalle...
+                </p>
+              ) : null}
+
               <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] p-4">
                 <p className="text-sm text-[var(--text-primary)]">
-                  {selectedOffer.offer_description}
+                  {(detailData ?? detailFallback).offer_description}
                 </p>
               </div>
 
@@ -688,56 +717,197 @@ export function OffersReview({ initialList, companies }: OffersReviewProps) {
                 <div className="rounded-xl border border-[var(--border)] p-3 text-sm">
                   <p className="text-[var(--text-muted)]">Precio regular</p>
                   <p className="font-medium text-[var(--text-primary)]">
-                    {formatCurrency(selectedOffer.offer_regular_price)}
+                    {formatCurrency((detailData ?? detailFallback).offer_regular_price)}
                   </p>
                 </div>
                 <div className="rounded-xl border border-[var(--border)] p-3 text-sm">
                   <p className="text-[var(--text-muted)]">Precio oferta</p>
                   <p className="font-medium text-[var(--text-primary)]">
-                    {formatCurrency(selectedOffer.offer_price)}
+                    {formatCurrency((detailData ?? detailFallback).offer_price)}
                   </p>
                 </div>
                 <div className="rounded-xl border border-[var(--border)] p-3 text-sm">
                   <p className="text-[var(--text-muted)]">Vigencia de oferta</p>
                   <p className="font-medium text-[var(--text-primary)]">
-                    {formatDate(selectedOffer.offer_start_date)} -{" "}
-                    {formatDate(selectedOffer.offer_end_date)}
+                    {formatDate((detailData ?? detailFallback).offer_start_date)} -{" "}
+                    {formatDate((detailData ?? detailFallback).offer_end_date)}
                   </p>
                 </div>
                 <div className="rounded-xl border border-[var(--border)] p-3 text-sm">
                   <p className="text-[var(--text-muted)]">Uso del cupon hasta</p>
                   <p className="font-medium text-[var(--text-primary)]">
-                    {formatDate(selectedOffer.coupon_usage_deadline)}
+                    {formatDate((detailData ?? detailFallback).coupon_usage_deadline)}
                   </p>
                 </div>
                 <div className="rounded-xl border border-[var(--border)] p-3 text-sm">
                   <p className="text-[var(--text-muted)]">Cantidad limite</p>
                   <p className="font-medium text-[var(--text-primary)]">
-                    {selectedOffer.coupon_quantity_limit ?? "Sin limite definido"}
+                    {(detailData ?? detailFallback).coupon_quantity_limit ??
+                      "Sin limite definido"}
                   </p>
                 </div>
                 <div className="rounded-xl border border-[var(--border)] p-3 text-sm">
                   <p className="text-[var(--text-muted)]">Estado</p>
                   <p className="font-medium text-[var(--text-primary)]">
-                    {getStateLabel(selectedOffer)}
+                    {getStateLabel(detailData ?? detailFallback)}
                   </p>
                 </div>
               </div>
 
               <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] p-4">
                 <p className="text-sm font-medium text-[var(--text-primary)]">
-                  Comentario de revision
+                  Imagenes de la oferta
                 </p>
-                <p className="mt-1 text-sm text-[var(--text-muted)]">
-                  {selectedOffer.offer_rejection_reason ||
-                    "Sin comentario registrado."}
+                {detailData?.offer_id === detailFallback.offer_id &&
+                detailData.images.length ? (
+                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                    {detailData.images.map((image) => (
+                      <figure
+                        key={image.offer_carousel_image_id}
+                        className="overflow-hidden rounded-xl border border-[var(--border)] bg-white"
+                      >
+                        <Image
+                          src={image.image_url}
+                          alt={image.image_alt_text ?? "Imagen de oferta"}
+                          width={640}
+                          height={360}
+                          unoptimized
+                          className="h-36 w-full object-cover"
+                        />
+                        <figcaption className="flex items-center justify-between gap-2 px-3 py-2 text-xs text-[var(--text-muted)]">
+                          <span>
+                            {image.image_alt_text || "Sin texto alternativo"}
+                          </span>
+                          {image.main_image ? (
+                            <span className="rounded bg-[var(--accent-soft)] px-2 py-1 text-[var(--brand-blue)]">
+                              Principal
+                            </span>
+                          ) : null}
+                        </figcaption>
+                      </figure>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="mt-2 text-sm text-[var(--text-muted)]">
+                    No hay imagenes registradas para esta oferta.
+                  </p>
+                )}
+              </div>
+
+              <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] p-4">
+                <p className="text-sm font-medium text-[var(--text-primary)]">
+                  Detalles de la oferta
                 </p>
-                <p className="mt-3 text-xs text-[var(--text-muted)]">
-                  Revisada:{" "}
-                  {selectedOffer.reviewed_at
-                    ? formatDateTime(selectedOffer.reviewed_at)
-                    : "Pendiente de revision"}
+                {detailData?.list_details.length ? (
+                  <div className="mt-3 space-y-2">
+                    {detailData.list_details.map((item) => (
+                      <div
+                        key={item.offer_list_detail_id}
+                        className="rounded-lg border border-[var(--border)] bg-white p-3"
+                      >
+                        <p className="text-sm font-medium text-[var(--text-primary)]">
+                          {item.item_title}
+                        </p>
+                        <p className="mt-1 text-sm text-[var(--text-muted)]">
+                          {item.item_description}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="mt-2 text-sm text-[var(--text-muted)]">
+                    No hay detalles adicionales registrados.
+                  </p>
+                )}
+              </div>
+
+              <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] p-4">
+                <p className="text-sm font-medium text-[var(--text-primary)]">
+                  Ordenes asociadas
                 </p>
+                {detailData?.order_details.length ? (
+                  <div className="mt-3 overflow-x-auto rounded-lg border border-[var(--border)] bg-white">
+                    <table className="min-w-full divide-y divide-[var(--border)] text-sm">
+                      <thead className="bg-[var(--surface-soft)]">
+                        <tr>
+                          <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">
+                            Orden
+                          </th>
+                          <th className="px-3 py-2 text-center text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">
+                            Estado
+                          </th>
+                          <th className="px-3 py-2 text-center text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">
+                            Cantidad
+                          </th>
+                          <th className="px-3 py-2 text-center text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">
+                            Subtotal
+                          </th>
+                          <th className="px-3 py-2 text-center text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">
+                            Pago
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[var(--border)]">
+                        {detailData.order_details.map((order) => (
+                          <tr key={order.order_item_id}>
+                            <td className="px-3 py-2 text-[var(--text-primary)]">
+                              <span className="block max-w-[160px] truncate">
+                                {order.order_id ?? "Sin orden"}
+                              </span>
+                              {order.order_payment_ref ? (
+                                <span className="block max-w-[160px] truncate text-xs text-[var(--text-muted)]">
+                                  Ref: {order.order_payment_ref}
+                                </span>
+                              ) : null}
+                            </td>
+                            <td className="px-3 py-2 text-center text-[var(--text-muted)]">
+                              {order.order_status}
+                            </td>
+                            <td className="px-3 py-2 text-center text-[var(--text-primary)]">
+                              {order.quantity}
+                            </td>
+                            <td className="px-3 py-2 text-center text-[var(--text-primary)]">
+                              {formatCurrency(order.subtotal)}
+                            </td>
+                            <td className="px-3 py-2 text-center text-[var(--text-muted)]">
+                              {order.order_paid_at
+                                ? formatDateTime(order.order_paid_at)
+                                : "Pendiente"}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <p className="mt-2 text-sm text-[var(--text-muted)]">
+                    No hay ordenes asociadas a esta oferta.
+                  </p>
+                )}
+              </div>
+
+              <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] p-4">
+                {(() => {
+                  const activeOffer = detailData ?? detailFallback;
+
+                  return (
+                    <>
+                      <p className="text-sm font-medium text-[var(--text-primary)]">
+                        Comentario de revision
+                      </p>
+                      <p className="mt-1 text-sm text-[var(--text-muted)]">
+                        {activeOffer.offer_rejection_reason ||
+                          "Sin comentario registrado."}
+                      </p>
+                      <p className="mt-3 text-xs text-[var(--text-muted)]">
+                        Revisada:{" "}
+                        {activeOffer.reviewed_at
+                          ? formatDateTime(activeOffer.reviewed_at)
+                          : "Pendiente de revision"}
+                      </p>
+                    </>
+                  );
+                })()}
               </div>
             </div>
           </section>
