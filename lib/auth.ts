@@ -1,11 +1,8 @@
 import { redirect } from "next/navigation";
+import type { DbUserRole } from "@/lib/roles";
 import { createClient } from "@/lib/supabase/server";
 
-export type AppRole =
-  | "ADMIN_PLATFORM"
-  | "ADMIN_COMPANY"
-  | "EMPLOYEE"
-  | "CUSTOMER";
+export type AppRole = DbUserRole;
 
 export type AuthProfile = {
   user_id: string;
