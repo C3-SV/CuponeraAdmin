@@ -2,13 +2,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
-const PUBLIC_ROUTES = [
-  "/auth/login",
-  "/auth/forgot-password",
-  "/auth/recover-password",
-  "/auth/callback",
-];
-
 const PRIVATE_PREFIXES = [
   "/dashboard",
   "/profile",
@@ -26,12 +19,6 @@ const PRIVATE_PREFIXES = [
   "/coupon-redemption",
 ];
 
-function isPublicRoute(pathname: string) {
-  return PUBLIC_ROUTES.some(
-    (route) => pathname === route || pathname.startsWith(`${route}/`)
-  );
-}
-
 function isPrivateRoute(pathname: string) {
   return PRIVATE_PREFIXES.some(
     (route) => pathname === route || pathname.startsWith(`${route}/`)
@@ -39,7 +26,7 @@ function isPrivateRoute(pathname: string) {
 }
 
 export async function middleware(request: NextRequest) {
-  let response = NextResponse.next();
+  const response = NextResponse.next();
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -64,7 +51,6 @@ export async function middleware(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
 
-  const publicRoute = isPublicRoute(pathname);
   const privateRoute = isPrivateRoute(pathname);
 
   // Si no hay sesión y quiere entrar a una ruta privada
