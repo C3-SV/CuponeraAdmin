@@ -695,6 +695,7 @@ export async function createCompanyOffer(
         .eq("offer_id", data.offer_id)
         .eq("company_id", context.companyId);
 
+      revalidatePath("/company-offers");
       return relationResult;
     }
 
@@ -778,6 +779,7 @@ export async function updateCompanyOffer(
     const relationResult = await replaceOfferRelations(offerId, normalized);
 
     if (!relationResult.ok) {
+      revalidatePath("/company-offers");
       return relationResult;
     }
 

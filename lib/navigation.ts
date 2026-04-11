@@ -3,11 +3,23 @@ export type AppRole =
   | "company_admin"
   | "company_employee";
 
+export type NavIconName =
+  | "dashboard"
+  | "shield"
+  | "tags"
+  | "building"
+  | "briefcase"
+  | "clipboard"
+  | "chart"
+  | "users"
+  | "ticket"
+  | "employees"
+  | "scan";
+
 export type NavItem = {
   href: string;
   label: string;
-  subtitle: string;
-  iconToken: string;
+  icon: NavIconName;
   allowedRoles: AppRole[];
 };
 
@@ -29,8 +41,7 @@ export const NAV_SECTIONS: NavSection[] = [
       {
         href: "/dashboard",
         label: "Dashboard",
-        subtitle: "Vista general base",
-        iconToken: "DB",
+        icon: "dashboard",
         allowedRoles: allRoles,
       },
     ],
@@ -41,50 +52,43 @@ export const NAV_SECTIONS: NavSection[] = [
       {
         href: "/platform-admins",
         label: "Administradores",
-        subtitle: "CRUD de admins internos",
-        iconToken: "PA",
+        icon: "shield",
         allowedRoles: ["couponera_admin"],
       },
       {
         href: "/categories",
         label: "Rubros",
-        subtitle: "CRUD de rubros",
-        iconToken: "RU",
+        icon: "tags",
         allowedRoles: ["couponera_admin"],
       },
       {
         href: "/companies",
         label: "Empresas",
-        subtitle: "CRUD de empresas ofertantes",
-        iconToken: "EM",
+        icon: "building",
         allowedRoles: ["couponera_admin"],
       },
       {
         href: "/company-admin-assignment",
-        label: "Admin Empresa",
-        subtitle: "CRUD + Vinculacion de profiles",
-        iconToken: "AE",
+        label: "Contactos empresas",
+        icon: "briefcase",
         allowedRoles: ["couponera_admin"],
       },
       {
         href: "/offers-review",
-        label: "Revision de Ofertas",
-        subtitle: "Aprobar, rechazar y comentar",
-        iconToken: "OF",
+        label: "Revisión de ofertas",
+        icon: "clipboard",
         allowedRoles: ["couponera_admin"],
       },
       {
         href: "/approved-offers-stats",
-        label: "Estadisticas de Ofertas",
-        subtitle: "Ventas, disponibles y comision",
-        iconToken: "ST",
+        label: "Métricas",
+        icon: "chart",
         allowedRoles: ["couponera_admin"],
       },
       {
         href: "/customers",
-        label: "Clientes y Cupones",
-        subtitle: "Listado, detalle y estado",
-        iconToken: "CL",
+        label: "Clientes",
+        icon: "users",
         allowedRoles: ["couponera_admin"],
       },
     ],
@@ -94,16 +98,14 @@ export const NAV_SECTIONS: NavSection[] = [
     items: [
       {
         href: "/company-offers",
-        label: "Ofertas de Mi Empresa",
-        subtitle: "Crear y actualizar ofertas",
-        iconToken: "OM",
+        label: "Mis ofertas",
+        icon: "ticket",
         allowedRoles: ["company_admin"],
       },
       {
         href: "/company-employees",
         label: "Empleados",
-        subtitle: "CRUD de empleados",
-        iconToken: "EP",
+        icon: "employees",
         allowedRoles: ["company_admin"],
       },
     ],
@@ -113,9 +115,8 @@ export const NAV_SECTIONS: NavSection[] = [
     items: [
       {
         href: "/coupon-redemption",
-        label: "Canje de Cupon",
-        subtitle: "Validacion por codigo, enlace o QR",
-        iconToken: "CJ",
+        label: "Canje de cupón",
+        icon: "scan",
         allowedRoles: ["company_employee"],
       },
     ],

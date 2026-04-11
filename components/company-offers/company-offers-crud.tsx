@@ -115,6 +115,10 @@ function formatDate(value: string): string {
   }).format(new Date(`${value}T00:00:00`));
 }
 
+function normalizeDecimalInput(value: string): string {
+  return value.replace(/,/g, ".");
+}
+
 function toImagePayload(file: File): Promise<OfferImagePayload> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -201,6 +205,27 @@ function OfferFormSkeleton() {
   );
 }
 
+function OfferDetailSkeleton() {
+  return (
+    <div className="animate-pulse space-y-4">
+      <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] p-4">
+        <div className="h-5 w-56 rounded bg-white" />
+        <div className="mt-3 h-4 w-full max-w-xl rounded bg-white" />
+        <div className="mt-2 h-4 w-4/5 rounded bg-white" />
+      </div>
+      <div className="grid gap-3 md:grid-cols-2">
+        <div className="h-32 rounded-xl bg-[var(--surface-soft)]" />
+        <div className="h-32 rounded-xl bg-[var(--surface-soft)]" />
+      </div>
+      <div className="h-36 rounded-xl bg-[var(--surface-soft)]" />
+      <div className="grid gap-3 md:grid-cols-2">
+        <div className="h-56 rounded-xl bg-[var(--surface-soft)]" />
+        <div className="h-56 rounded-xl bg-[var(--surface-soft)]" />
+      </div>
+    </div>
+  );
+}
+
 function ArrowUpIcon() {
   return (
     <svg
@@ -263,6 +288,56 @@ function EditImageIcon() {
     >
       <path d="M13.9 3.6a2 2 0 0 1 2.8 2.8l-8.4 8.4-3.4.6.6-3.4 8.4-8.4Z" />
       <path d="m12.5 5 2.5 2.5" />
+    </svg>
+  );
+}
+
+function DetailIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 20 20"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      className="h-3.5 w-3.5"
+    >
+      <circle cx="10" cy="10" r="7" />
+      <line x1="10" y1="8.3" x2="10" y2="13.4" />
+      <circle cx="10" cy="5.8" r="0.9" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+function EditIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 20 20"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      className="h-3.5 w-3.5"
+    >
+      <path d="M13.9 3.6a2 2 0 0 1 2.8 2.8l-8.4 8.4-3.4.6.6-3.4 8.4-8.4Z" />
+      <path d="m12.5 5 2.5 2.5" />
+    </svg>
+  );
+}
+
+function ReasonIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 20 20"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      className="h-3.5 w-3.5"
+    >
+      <path d="M4.5 4.5h11v8.2h-4.1L8.2 15.9v-3.2H4.5V4.5Z" />
+      <path d="M7.2 7.3h5.6" />
+      <path d="M7.2 9.8h3.7" />
     </svg>
   );
 }
@@ -812,7 +887,7 @@ export function CompanyOffersCrud({
   async function showRejectionReason(offer: OfferListItem) {
     await Swal.fire({
       icon: "info",
-      title: "Motivo de rechazo",
+      title: "Motivo",
       text: offer.offer_rejection_reason || "No hay comentario registrado.",
       confirmButtonColor: "#0f3d78",
     });
@@ -1084,8 +1159,8 @@ export function CompanyOffersCrud({
                         <p className="font-medium text-[var(--text-primary)]">
                           {formatCurrency(offer.offer_price)}
                         </p>
-                        <p className="text-xs text-[var(--text-muted)]">
-                          Regular {formatCurrency(offer.offer_regular_price)}
+                        <p className="text-xs text-[var(--text-muted)] line-through">
+                          {formatCurrency(offer.offer_regular_price)}
                         </p>
                       </td>
                       <td className="px-4 py-3 text-center text-xs text-[var(--text-muted)]">
@@ -1100,23 +1175,27 @@ export function CompanyOffersCrud({
                           <button
                             type="button"
                             onClick={() => void openDetailModal(offer.offer_id)}
-                            className="rounded-lg border border-[var(--border)] px-3 py-1.5 text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--surface-soft)]"
+                            className="inline-flex items-center gap-1 rounded-lg border border-[var(--border)] px-3 py-1.5 text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--surface-soft)]"
                           >
+                            <DetailIcon />
                             Detalle
                           </button>
                           <button
                             type="button"
                             onClick={() => void openEditModal(offer.offer_id)}
-                            className="rounded-lg bg-[var(--brand-blue)] px-3 py-1.5 text-xs font-medium text-white hover:bg-[var(--accent-strong)]"
+                            className="inline-flex items-center gap-1 rounded-lg bg-[var(--brand-blue)] px-3 py-1.5 text-xs font-medium text-white hover:bg-[var(--accent-strong)]"
                           >
+                            <EditIcon />
                             Editar
                           </button>
-                          {offer.offer_status === "REJECTED" ? (
+                          {offer.offer_status === "REJECTED" ||
+                          offer.offer_status === "DISCARDED" ? (
                             <button
                               type="button"
                               onClick={() => void showRejectionReason(offer)}
-                              className="rounded-lg bg-[var(--brand-orange)] px-3 py-1.5 text-xs font-medium text-white hover:bg-[var(--brand-orange-strong)]"
+                              className="inline-flex items-center gap-1 rounded-lg bg-[var(--brand-orange)] px-3 py-1.5 text-xs font-medium text-white hover:bg-[var(--brand-orange-strong)]"
                             >
+                              <ReasonIcon />
                               Motivo
                             </button>
                           ) : null}
@@ -1250,12 +1329,14 @@ export function CompanyOffersCrud({
                       Precio regular
                     </span>
                     <input
-                      type="number"
-                      min="0"
-                      step="0.01"
+                      type="text"
+                      inputMode="decimal"
                       value={formValues.offer_regular_price}
                       onChange={(event) =>
-                        handleValueChange("offer_regular_price", event.target.value)
+                        handleValueChange(
+                          "offer_regular_price",
+                          normalizeDecimalInput(event.target.value),
+                        )
                       }
                       className="h-10 w-full rounded-xl border border-[var(--border)] px-3 text-sm outline-none"
                     />
@@ -1271,12 +1352,14 @@ export function CompanyOffersCrud({
                       Precio oferta
                     </span>
                     <input
-                      type="number"
-                      min="0"
-                      step="0.01"
+                      type="text"
+                      inputMode="decimal"
                       value={formValues.offer_price}
                       onChange={(event) =>
-                        handleValueChange("offer_price", event.target.value)
+                        handleValueChange(
+                          "offer_price",
+                          normalizeDecimalInput(event.target.value),
+                        )
                       }
                       className="h-10 w-full rounded-xl border border-[var(--border)] px-3 text-sm outline-none"
                     />
@@ -1353,6 +1436,7 @@ export function CompanyOffersCrud({
                       type="number"
                       min="0"
                       step="1"
+                      required
                       value={formValues.coupon_quantity_limit}
                       onChange={(event) =>
                         handleValueChange(
@@ -1690,7 +1774,7 @@ export function CompanyOffersCrud({
             </header>
 
             {isDetailLoading ? (
-              <p className="text-sm text-[var(--text-muted)]">Cargando detalle...</p>
+              <OfferDetailSkeleton />
             ) : null}
 
             {!isDetailLoading && detailData ? (
