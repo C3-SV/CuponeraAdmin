@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState } from "react";
 import { forgotPasswordAction, type ForgotPasswordState } from "./actions";
 
@@ -15,13 +16,13 @@ export default function ForgotPasswordForm() {
   );
 
   return (
-    <form action={formAction} className="space-y-5">
+    <form action={formAction} className="space-y-6">
       <div className="space-y-2">
         <label
           htmlFor="email"
           className="text-sm font-medium text-[var(--text-primary)]"
         >
-          Correo electrónico
+          {"Correo electrónico"}
         </label>
         <input
           id="email"
@@ -44,13 +45,22 @@ export default function ForgotPasswordForm() {
         </div>
       ) : null}
 
-      <button
-        type="submit"
-        disabled={pending}
-        className="w-full rounded-xl bg-[var(--brand-blue)] px-4 py-3 text-sm font-medium text-white transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-70"
-      >
-        {pending ? "Enviando..." : "Enviar enlace de recuperación"}
-      </button>
+      <div className="flex flex-col-reverse gap-3 border-t border-[var(--border)] pt-6 sm:flex-row sm:items-center">
+        <Link
+          href="/auth/login"
+          className="inline-flex w-full items-center justify-center rounded-xl border border-[var(--border)] bg-white px-4 py-3 text-sm font-medium text-[var(--text-primary)] transition hover:bg-[var(--accent-soft)] sm:flex-1"
+        >
+          Volver al login
+        </Link>
+
+        <button
+          type="submit"
+          disabled={pending}
+          className="w-full rounded-xl bg-[var(--brand-blue)] px-4 py-3 text-sm font-medium text-white transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-70 sm:flex-1"
+        >
+          {pending ? "Enviando..." : "Enviar enlace de recuperación"}
+        </button>
+      </div>
     </form>
   );
 }
