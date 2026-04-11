@@ -59,9 +59,38 @@ function getSortIndicator(
   return query.sortDir === "asc" ? "\u2191" : "\u2193";
 }
 
+function EditIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-3.5 w-3.5">
+      <path d="M13.9 3.6a2 2 0 0 1 2.8 2.8l-8.4 8.4-3.4.6.6-3.4 8.4-8.4Z" />
+      <path d="m12.5 5 2.5 2.5" />
+    </svg>
+  );
+}
+
+function DeleteIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-3.5 w-3.5">
+      <path d="M3.8 5.8h12.4" />
+      <path d="M7.2 5.8V4.5a1 1 0 0 1 1-1h3.6a1 1 0 0 1 1 1v1.3" />
+      <path d="M5.9 5.8v9.2a1 1 0 0 0 1 1h6.2a1 1 0 0 0 1-1V5.8" />
+      <path d="M8.5 8.4v5.1M11.5 8.4v5.1" />
+    </svg>
+  );
+}
+
+function CloseIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4">
+      <path d="M5.5 5.5 14.5 14.5M14.5 5.5 5.5 14.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 export function CategoriesCrud({ initialList }: CategoriesCrudProps) {
   const [list, setList] = useState<CategoriesListResponse>(initialList);
   const [query, setQuery] = useState<CategoryQueryParams>(DEFAULT_QUERY);
+  const queryRef = useRef<CategoryQueryParams>(DEFAULT_QUERY);
   const [searchInput, setSearchInput] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -76,6 +105,8 @@ export function CategoriesCrud({ initialList }: CategoriesCrudProps) {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  useEffect(() => { queryRef.current = query; }, [query]);
+
   const fetchList = useCallback(async (params: CategoryQueryParams) => {
     setLoading(true);
     const result = await listCategories(params);
@@ -85,39 +116,36 @@ export function CategoriesCrud({ initialList }: CategoriesCrudProps) {
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      const next = { ...query, search: searchInput, page: 1 };
+      const next = { ...queryRef.current, search: searchInput, page: 1 };
       setQuery(next);
-      fetchList(next);
+      void fetchList(next);
     }, 350);
     return () => clearTimeout(timer);
-  }, [searchInput]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [searchInput, fetchList]);
 
   useEffect(() => {
-    function handleEscape(e: KeyboardEvent) {
+    function onEscape(e: KeyboardEvent) {
       if (e.key === "Escape") setModalOpen(false);
     }
-    window.addEventListener("keydown", handleEscape);
-    return () => window.removeEventListener("keydown", handleEscape);
-  });
+    window.addEventListener("keydown", onEscape);
+    return () => window.removeEventListener("keydown", onEscape);
+  }, []);
 
   function handleSort(field: CategoryQueryParams["sortBy"]) {
     const next = {
-      ...query,
+      ...queryRef.current,
       sortBy: field,
-      sortDir:
-        query.sortBy === field && query.sortDir === "asc"
-          ? ("desc" as const)
-          : ("asc" as const),
+      sortDir: queryRef.current.sortBy === field && queryRef.current.sortDir === "asc" ? ("desc" as const) : ("asc" as const),
       page: 1,
     };
     setQuery(next);
-    fetchList(next);
+    void fetchList(next);
   }
 
   function handlePage(page: number) {
-    const next = { ...query, page };
+    const next = { ...queryRef.current, page };
     setQuery(next);
-    fetchList(next);
+    void fetchList(next);
   }
 
   function openCreate() {
@@ -133,10 +161,7 @@ export function CategoriesCrud({ initialList }: CategoriesCrudProps) {
   function openEdit(category: CategoryListItem) {
     setFormMode("edit");
     setSelectedCategory(category);
-    setForm({
-      category_name: category.category_name,
-      alt_text: category.alt_text ?? "",
-    });
+    setForm({ category_name: category.category_name, alt_text: category.alt_text ?? "" });
     setFormErrors({});
     setImageFile(null);
     setImagePreview(category.category_img_url);
@@ -146,7 +171,6 @@ export function CategoriesCrud({ initialList }: CategoriesCrudProps) {
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-
     const reader = new FileReader();
     reader.onload = (event) => {
       const dataUrl = event.target?.result as string;
@@ -161,281 +185,238 @@ export function CategoriesCrud({ initialList }: CategoriesCrudProps) {
     const { isValid, errors } = validateCategoryInput(normalized);
     if (!isValid) {
       setFormErrors(errors);
+      await Swal.fire({ icon: "warning", title: "Formulario incompleto", text: "Revisa los campos marcados y vuelve a intentar.", confirmButtonColor: "#0f3d78" });
       return;
     }
 
     setSaving(true);
-    const result =
-      formMode === "create"
-        ? await createCategory(normalized, imageFile)
-        : await updateCategory(selectedCategory!.category_id, normalized, imageFile);
+    const result = formMode === "create"
+      ? await createCategory(normalized, imageFile)
+      : await updateCategory(selectedCategory!.category_id, normalized, imageFile);
     setSaving(false);
 
     if (!result.ok) {
-      Swal.fire({ icon: "error", title: "Error", text: result.message, confirmButtonColor: "var(--accent)" });
+      await Swal.fire({ icon: "error", title: "Operacion fallida", text: result.message, confirmButtonColor: "#0f3d78" });
       return;
     }
-
     setModalOpen(false);
-    fetchList(query);
-    Swal.fire({
-      icon: "success",
-      title: "Listo",
-      text: result.message,
-      confirmButtonColor: "var(--accent)",
-      timer: 2000,
-      showConfirmButton: false,
-    });
+    void fetchList(queryRef.current);
+    await Swal.fire({ icon: "success", title: formMode === "create" ? "Rubro creado" : "Rubro actualizado", text: result.message, confirmButtonColor: "#0f3d78" });
   }
 
   async function handleDelete(category: CategoryListItem) {
-    const confirm = await Swal.fire({
+    const confirmation = await Swal.fire({
       icon: "warning",
-      title: "¿Eliminar rubro?",
-      text: `"${category.category_name}" será eliminado del sistema.`,
+      title: "Eliminar rubro",
+      text: `Esta accion marcara "${category.category_name}" como eliminado.`,
       showCancelButton: true,
-      confirmButtonText: "Eliminar",
+      confirmButtonText: "Si, eliminar",
       cancelButtonText: "Cancelar",
-      confirmButtonColor: "var(--danger)",
+      confirmButtonColor: "#e26721",
+      cancelButtonColor: "#0f3d78",
     });
-
-    if (!confirm.isConfirmed) return;
+    if (!confirmation.isConfirmed) return;
 
     const result = await softDeleteCategory(category.category_id);
-
     if (!result.ok) {
-      Swal.fire({ icon: "error", title: "Error", text: result.message, confirmButtonColor: "var(--accent)" });
+      await Swal.fire({ icon: "error", title: "No se pudo eliminar", text: result.message, confirmButtonColor: "#0f3d78" });
       return;
     }
-
-    fetchList(query);
-    Swal.fire({
-      icon: "success",
-      title: "Listo",
-      text: result.message,
-      confirmButtonColor: "var(--accent)",
-      timer: 2000,
-      showConfirmButton: false,
-    });
+    const nextPage = list.data.length === 1 && query.page > 1 ? query.page - 1 : query.page;
+    const next = { ...queryRef.current, page: nextPage };
+    setQuery(next);
+    void fetchList(next);
+    await Swal.fire({ icon: "success", title: "Rubro eliminado", text: result.message, confirmButtonColor: "#0f3d78" });
   }
 
   const totalPages = Math.max(1, Math.ceil(list.total / query.pageSize));
 
   return (
     <>
-      <section className="space-y-4 rounded-3xl border border-(--border) bg-(--surface) p-5 shadow-[0_6px_14px_-12px_rgba(15,23,42,0.24)] lg:p-7">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div className="space-y-1">
-            <h1 className="text-2xl font-semibold tracking-tight text-foreground">Rubros</h1>
-            <p className="text-sm text-(--text-muted)">
-              Categorías que clasifican a las empresas ofertantes.
-            </p>
-          </div>
+      <section className="space-y-5 rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[0_6px_14px_-12px_rgba(15,23,42,0.24)] lg:p-7">
+        <div className="space-y-1">
+          <h1 className="text-2xl font-semibold tracking-tight text-[var(--text-primary)]">Rubros</h1>
+          <p className="text-sm text-[var(--text-muted)]">
+            Gestiona los rubros que clasifican a las empresas ofertantes.
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-3">
           <button
             type="button"
             onClick={openCreate}
-            className="rounded-xl bg-(--accent) px-4 py-2 text-sm font-semibold text-white hover:bg-(--accent-strong)"
+            className="h-10 rounded-xl bg-[var(--brand-blue)] px-4 text-sm font-medium text-white hover:bg-[var(--accent-strong)]"
           >
-            + Nuevo rubro
+            Crear rubro
           </button>
+          <input
+            type="text"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            placeholder="Buscar por nombre..."
+            className="h-10 w-full rounded-xl border border-[var(--border)] bg-white px-3 text-sm text-[var(--text-primary)] outline-none sm:w-[260px]"
+          />
         </div>
 
-        <input
-          type="search"
-          placeholder="Buscar por nombre…"
-          value={searchInput}
-          onChange={(e) => setSearchInput(e.target.value)}
-          className="w-full max-w-xs rounded-xl border border-(--border) bg-(--surface-soft) px-3 py-2 text-sm outline-none focus:border-(--accent) focus:ring-1 focus:ring-(--accent)"
-        />
-
-        <div className="overflow-x-auto rounded-2xl border border-(--border)">
-          <table className="min-w-full divide-y divide-(--border)">
-            <thead className="bg-(--surface-soft)">
+        <div className="overflow-x-auto rounded-2xl border border-[var(--border)]">
+          <table className="min-w-full divide-y divide-[var(--border)] bg-white">
+            <thead className="bg-[var(--surface-soft)]">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.08em] text-(--text-muted)">
-                  Icono
+                <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">Icono</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">
+                  <div className="inline-flex items-center gap-1 whitespace-nowrap">
+                    <span>Nombre</span>
+                    <button type="button" onClick={() => handleSort("category_name")} className="inline-flex h-5 w-5 items-center justify-center rounded text-xs text-[var(--text-muted)] hover:bg-[var(--surface)]" aria-label="Ordenar por nombre">
+                      {getSortIndicator("category_name", query)}
+                    </button>
+                  </div>
                 </th>
-                <th
-                  onClick={() => handleSort("category_name")}
-                  className="cursor-pointer px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.08em] text-(--text-muted) hover:text-foreground"
-                >
-                  Nombre {getSortIndicator("category_name", query)}
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">Alt text</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">
+                  <div className="inline-flex items-center gap-1 whitespace-nowrap">
+                    <span>Creado</span>
+                    <button type="button" onClick={() => handleSort("created_at")} className="inline-flex h-5 w-5 items-center justify-center rounded text-xs text-[var(--text-muted)] hover:bg-[var(--surface)]" aria-label="Ordenar por fecha">
+                      {getSortIndicator("created_at", query)}
+                    </button>
+                  </div>
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.08em] text-(--text-muted)">
-                  Alt text
-                </th>
-                <th
-                  onClick={() => handleSort("created_at")}
-                  className="cursor-pointer px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.08em] text-(--text-muted) hover:text-foreground"
-                >
-                  Creado {getSortIndicator("created_at", query)}
-                </th>
-                <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-[0.08em] text-(--text-muted)">
-                  Acciones
-                </th>
+                <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">Acciones</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-(--border) bg-(--surface)">
+            <tbody className="divide-y divide-[var(--border)]">
               {loading ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-6 text-center text-sm text-(--text-muted)">
-                    Cargando…
-                  </td>
+                  <td colSpan={5} className="px-4 py-6 text-center text-sm text-[var(--text-muted)]">Cargando rubros...</td>
                 </tr>
-              ) : list.data.length === 0 ? (
+              ) : null}
+              {!loading && list.data.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-6 text-center text-sm text-(--text-muted)">
-                    No se encontraron rubros.
+                  <td colSpan={5} className="px-4 py-6 text-center text-sm text-[var(--text-muted)]">No hay rubros para mostrar.</td>
+                </tr>
+              ) : null}
+              {!loading ? list.data.map((cat) => (
+                <tr key={cat.category_id} className="hover:bg-[var(--surface-soft)]/60">
+                  <td className="px-4 py-3 text-center">
+                    {cat.category_img_url ? (
+                      <Image
+                        src={cat.category_img_url}
+                        alt={cat.alt_text ?? cat.category_name}
+                        width={48}
+                        height={48}
+                        unoptimized
+                        className="mx-auto h-12 w-12 rounded-lg border border-[var(--border)] bg-white object-contain p-1"
+                      />
+                    ) : (
+                      <span className="inline-flex rounded-lg border border-[var(--border)] bg-[var(--surface-soft)] px-2 py-1 text-xs text-[var(--text-muted)]">Sin icono</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-sm font-medium text-[var(--text-primary)]">{cat.category_name}</td>
+                  <td className="px-4 py-3 text-sm text-[var(--text-muted)]">{cat.alt_text ?? "—"}</td>
+                  <td className="px-4 py-3 text-sm text-[var(--text-muted)]">{formatDate(cat.created_at)}</td>
+                  <td className="px-4 py-3">
+                    <div className="flex justify-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => openEdit(cat)}
+                        className="inline-flex items-center gap-1 rounded-lg bg-[var(--brand-blue)] px-3 py-1.5 text-xs font-medium text-white hover:bg-[var(--accent-strong)]"
+                      >
+                        <EditIcon />
+                        Editar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void handleDelete(cat)}
+                        className="inline-flex items-center gap-1 rounded-lg bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700"
+                      >
+                        <DeleteIcon />
+                        Eliminar
+                      </button>
+                    </div>
                   </td>
                 </tr>
-              ) : (
-                list.data.map((cat) => (
-                  <tr key={cat.category_id} className="hover:bg-(--surface-soft)/70">
-                    <td className="px-4 py-3">
-                      {cat.category_img_url ? (
-                        <Image
-                          src={cat.category_img_url}
-                          alt={cat.alt_text ?? cat.category_name}
-                          width={36}
-                          height={36}
-                          className="rounded-lg object-contain"
-                        />
-                      ) : (
-                        <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-(--surface-soft) text-xs text-(--text-muted)">
-                          —
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-sm font-medium text-foreground">
-                      {cat.category_name}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-(--text-muted)">
-                      {cat.alt_text ?? "—"}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-(--text-muted)">
-                      {formatDate(cat.created_at)}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex justify-end gap-2">
-                        <button
-                          type="button"
-                          onClick={() => openEdit(cat)}
-                          className="rounded-lg border border-(--border) px-3 py-1.5 text-xs font-medium text-foreground hover:bg-(--surface-soft)"
-                        >
-                          Editar
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDelete(cat)}
-                          className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50"
-                        >
-                          Eliminar
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
+              )) : null}
             </tbody>
           </table>
         </div>
 
-        {/* Paginación */}
-        <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-(--text-muted)">
-          <span>
-            {list.total === 0
-              ? "Sin resultados"
-              : `${(query.page - 1) * query.pageSize + 1}–${Math.min(query.page * query.pageSize, list.total)} de ${list.total}`}
-          </span>
-          <div className="flex gap-1">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="text-xs text-[var(--text-muted)]">
+            Mostrando {list.data.length} de {list.total} registros.
+          </p>
+          <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => handlePage(query.page - 1)}
-              disabled={query.page <= 1}
-              className="rounded-lg border border-(--border) px-3 py-1.5 disabled:opacity-40 hover:bg-(--surface-soft)"
+              onClick={() => handlePage(Math.max(1, query.page - 1))}
+              disabled={query.page <= 1 || loading}
+              className="h-9 rounded-lg border border-[var(--border)] px-3 text-sm text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-50"
             >
-              ‹
+              Anterior
             </button>
-            {Array.from({ length: totalPages }, (_, i) => i + 1)
-              .filter((p) => Math.abs(p - query.page) <= 2)
-              .map((p) => (
-                <button
-                  key={p}
-                  type="button"
-                  onClick={() => handlePage(p)}
-                  className={`rounded-lg border px-3 py-1.5 ${
-                    p === query.page
-                      ? "border-(--accent) bg-(--accent) text-white"
-                      : "border-(--border) hover:bg-(--surface-soft)"
-                  }`}
-                >
-                  {p}
-                </button>
-              ))}
+            <span className="text-sm text-[var(--text-muted)]">
+              Pagina {query.page} de {totalPages}
+            </span>
             <button
               type="button"
-              onClick={() => handlePage(query.page + 1)}
-              disabled={query.page >= totalPages}
-              className="rounded-lg border border-(--border) px-3 py-1.5 disabled:opacity-40 hover:bg-(--surface-soft)"
+              onClick={() => handlePage(Math.min(totalPages, query.page + 1))}
+              disabled={query.page >= totalPages || loading}
+              className="h-9 rounded-lg border border-[var(--border)] px-3 text-sm text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-50"
             >
-              ›
+              Siguiente
             </button>
           </div>
         </div>
       </section>
 
-      {/* Modal crear/editar */}
       {modalOpen && (
         <div className="fixed inset-0 z-40 grid place-items-center p-4">
-          <button
-            type="button"
-            aria-label="Cerrar modal"
-            onClick={() => setModalOpen(false)}
-            className="absolute inset-0 bg-[#0f2749]/45"
-          />
-          <section className="relative z-10 w-full max-w-md rounded-2xl border border-(--border) bg-(--surface) p-5 shadow-2xl lg:p-6">
-            <header className="mb-5 flex items-center justify-between border-b border-(--border) pb-4">
-              <h2 className="text-lg font-semibold text-foreground">
-                {formMode === "create" ? "Nuevo rubro" : "Editar rubro"}
-              </h2>
+          <button type="button" onClick={() => setModalOpen(false)} aria-label="Cerrar modal" className="absolute inset-0 bg-[#0f2749]/45" />
+          <section className="relative z-10 w-full max-w-md rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[0_18px_36px_-22px_rgba(15,23,42,0.35)] lg:p-6">
+            <header className="mb-4 flex items-start justify-between gap-4 border-b border-[var(--border)] pb-4">
+              <div>
+                <h2 className="text-xl font-semibold text-[var(--text-primary)]">
+                  {formMode === "create" ? "Crear rubro" : "Editar rubro"}
+                </h2>
+                <p className="text-sm text-[var(--text-muted)]">
+                  Completa los campos requeridos para guardar la informacion.
+                </p>
+              </div>
               <button
                 type="button"
                 onClick={() => setModalOpen(false)}
-                className="rounded-lg border border-(--border) px-2.5 py-1.5 text-sm text-(--text-muted) hover:bg-(--surface-soft)"
+                className="rounded-lg border border-[var(--border)] p-1.5 text-[var(--text-muted)] hover:bg-[var(--surface-soft)]"
+                aria-label="Cerrar"
               >
-                Cerrar
+                <CloseIcon />
               </button>
             </header>
 
             <div className="space-y-4">
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-(--text-muted)">Nombre *</label>
+              <label className="space-y-1">
+                <span className="text-xs font-medium text-[var(--text-muted)]">Nombre *</span>
                 <input
                   type="text"
                   value={form.category_name}
                   onChange={(e) => setForm({ ...form, category_name: e.target.value })}
-                  className="w-full rounded-xl border border-(--border) bg-(--surface-soft) px-3 py-2 text-sm outline-none focus:border-(--accent) focus:ring-1 focus:ring-(--accent)"
+                  className="h-10 w-full rounded-xl border border-[var(--border)] bg-white px-3 text-sm text-[var(--text-primary)] outline-none"
                 />
-                {formErrors.category_name && (
-                  <p className="text-xs text-red-500">{formErrors.category_name}</p>
-                )}
-              </div>
+                {formErrors.category_name && <p className="text-xs text-red-600">{formErrors.category_name}</p>}
+              </label>
 
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-(--text-muted)">Texto alternativo (accesibilidad)</label>
+              <label className="space-y-1">
+                <span className="text-xs font-medium text-[var(--text-muted)]">Texto alternativo (accesibilidad)</span>
                 <input
                   type="text"
                   value={form.alt_text}
-                  placeholder="Descripción del icono para lectores de pantalla"
+                  placeholder="Descripcion del icono para lectores de pantalla"
                   onChange={(e) => setForm({ ...form, alt_text: e.target.value })}
-                  className="w-full rounded-xl border border-(--border) bg-(--surface-soft) px-3 py-2 text-sm outline-none focus:border-(--accent) focus:ring-1 focus:ring-(--accent)"
+                  className="h-10 w-full rounded-xl border border-[var(--border)] bg-white px-3 text-sm text-[var(--text-primary)] outline-none"
                 />
-              </div>
+              </label>
 
               <div className="space-y-2">
-                <label className="text-xs font-medium text-(--text-muted)">
-                  Icono {formMode === "edit" ? "(dejar vacío para no cambiar)" : "(opcional)"}
-                </label>
+                <span className="text-xs font-medium text-[var(--text-muted)]">
+                  Icono {formMode === "edit" ? "(dejar vacio para no cambiar)" : "(opcional)"}
+                </span>
                 {imagePreview && (
                   <div className="flex items-center gap-3">
                     <Image
@@ -443,7 +424,8 @@ export function CategoriesCrud({ initialList }: CategoriesCrudProps) {
                       alt="Vista previa"
                       width={48}
                       height={48}
-                      className="rounded-xl border border-(--border) object-contain"
+                      unoptimized
+                      className="rounded-xl border border-[var(--border)] bg-white object-contain p-1"
                     />
                     <button
                       type="button"
@@ -452,7 +434,7 @@ export function CategoriesCrud({ initialList }: CategoriesCrudProps) {
                         setImagePreview(formMode === "edit" ? selectedCategory?.category_img_url ?? null : null);
                         if (fileInputRef.current) fileInputRef.current.value = "";
                       }}
-                      className="text-xs text-red-500 hover:underline"
+                      className="text-xs text-red-600 hover:underline"
                     >
                       Quitar nueva imagen
                     </button>
@@ -463,25 +445,14 @@ export function CategoriesCrud({ initialList }: CategoriesCrudProps) {
                   type="file"
                   accept="image/*"
                   onChange={handleFileChange}
-                  className="block w-full text-sm text-(--text-muted) file:mr-3 file:rounded-lg file:border file:border-(--border) file:bg-(--surface-soft) file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-foreground"
+                  className="block w-full text-sm text-[var(--text-muted)] file:mr-3 file:rounded-lg file:border file:border-[var(--border)] file:bg-[var(--surface-soft)] file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-[var(--text-primary)]"
                 />
               </div>
 
               <div className="flex justify-end gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setModalOpen(false)}
-                  className="rounded-xl border border-(--border) px-4 py-2 text-sm font-medium text-(--text-muted) hover:bg-(--surface-soft)"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="button"
-                  onClick={handleSave}
-                  disabled={saving}
-                  className="rounded-xl bg-(--accent) px-4 py-2 text-sm font-semibold text-white hover:bg-(--accent-strong) disabled:opacity-60"
-                >
-                  {saving ? "Guardando…" : formMode === "create" ? "Crear" : "Guardar"}
+                <button type="button" onClick={() => setModalOpen(false)} className="h-10 rounded-xl border border-[var(--border)] px-4 text-sm font-medium text-[var(--text-muted)] hover:bg-[var(--surface-soft)]">Cancelar</button>
+                <button type="button" onClick={() => void handleSave()} disabled={saving} className="h-10 rounded-xl bg-[var(--brand-blue)] px-4 text-sm font-medium text-white hover:bg-[var(--accent-strong)] disabled:cursor-not-allowed disabled:opacity-50">
+                  {saving ? "Guardando..." : formMode === "create" ? "Crear" : "Guardar"}
                 </button>
               </div>
             </div>
