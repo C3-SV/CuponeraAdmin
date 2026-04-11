@@ -1,24 +1,32 @@
-import Link from "next/link";
-import { ModulePlaceholder } from "@/components/dashboard/module-placeholder";
+// app/(admin)/(all-roles)/profile/page.tsx
+import { requireAdminProfile } from "@/lib/auth";
+import { logoutAction } from "@/app/auth/logout/actions";
+import { formatUserRole } from "@/lib/roles";
 
-export default function ProfilePage() {
+export default async function ProfilePage() {
+  const profile = await requireAdminProfile();
+
   return (
-    <ModulePlaceholder
-      title="Perfil"
-      description="Base de la vista de perfil. Los datos reales quedaran conectados a Supabase en la siguiente fase."
-      ownerHint="Responsable: Persona 1"
-    >
-      <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-4">
-        <p className="text-sm text-[var(--text-muted)]">
-          Desde aqui se accede al flujo de cambio de contrasena.
-        </p>
-        <Link
-          href="/change-password"
-          className="mt-3 inline-flex rounded-xl bg-[var(--brand-blue)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--accent-strong)]"
-        >
-          Ir a cambiar contrasena
-        </Link>
+    <section className="space-y-4">
+      <h1 className="text-2xl font-semibold">Mi perfil</h1>
+
+      <div className="rounded-xl border p-4 space-y-2">
+        <p><strong>Nombres:</strong> {profile.first_names}</p>
+        <p><strong>Apellidos:</strong> {profile.last_names}</p>
+        <p><strong>Correo:</strong> {profile.email}</p>
+        <p><strong>Rol:</strong> {formatUserRole(profile.user_role)}</p>
+        <p><strong>Activo:</strong> {profile.user_is_active ? "Sí" : "No"}</p>
+        <p><strong>Empresa:</strong> {profile.company_id ?? "No aplica"}</p>
       </div>
-    </ModulePlaceholder>
+
+      <form action={logoutAction}>
+        <button
+          type="submit"
+          className="rounded-lg bg-red-600 px-4 py-2 text-white hover:bg-red-700"
+        >
+          Cerrar sesión
+        </button>
+      </form>
+    </section>
   );
 }

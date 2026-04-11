@@ -201,7 +201,7 @@ export default function CustomersPage() {
     }
 
     return couponsByCustomer[selectedCustomer.id] ?? [];
-  }, [selectedCustomer]);
+  }, [couponsByCustomer, selectedCustomer]);
 
   const availableCoupons = useMemo(
     () => getCouponsByState(selectedCustomerCoupons, "disponible"),

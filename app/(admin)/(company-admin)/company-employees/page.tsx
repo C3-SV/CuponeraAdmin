@@ -1,11 +1,15 @@
-import { ModulePlaceholder } from "@/components/dashboard/module-placeholder";
+import { CompanyEmployeesCrud } from "@/components/company-employees/company-employees-crud";
+import { listCompanyEmployees } from "./actions";
 
-export default function CompanyEmployeesPage() {
-  return (
-    <ModulePlaceholder
-      title="Empleados de Empresa"
-      description="Base CRUD para cuentas de empleados de empresa usando profiles."
-      ownerHint="Responsable: Persona 5"
-    />
-  );
+export default async function CompanyEmployeesPage() {
+  const initialList = await listCompanyEmployees({
+    search: "",
+    status: "all",
+    sortBy: "first_names",
+    sortDir: "asc",
+    page: 1,
+    pageSize: 10,
+  });
+
+  return <CompanyEmployeesCrud initialList={initialList} />;
 }

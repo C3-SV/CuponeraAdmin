@@ -1,11 +1,24 @@
-import { ModulePlaceholder } from "@/components/dashboard/module-placeholder";
+import { ApprovedOffersStatsDashboard } from "@/components/approved-offers-stats/approved-offers-stats-dashboard";
+import {
+  listApprovedOfferStats,
+  listApprovedOfferStatsFilters,
+} from "./actions";
 
-export default function ApprovedOffersStatsPage() {
+export default async function ApprovedOffersStatsPage() {
+  const [initialList, filters] = await Promise.all([
+    listApprovedOfferStats({
+      search: "",
+      companyId: "",
+      categoryId: "",
+      sortBy: "offer_title",
+      sortDir: "asc",
+      page: 1,
+      pageSize: 10,
+    }),
+    listApprovedOfferStatsFilters(),
+  ]);
+
   return (
-    <ModulePlaceholder
-      title="Estadisticas de Ofertas Aprobadas"
-      description="Base para metricas de cupones vendidos, disponibles, ingresos totales y cargo por servicio."
-      ownerHint="Responsable: Persona 3"
-    />
+    <ApprovedOffersStatsDashboard initialList={initialList} filters={filters} />
   );
 }

@@ -1,11 +1,23 @@
-import { ModulePlaceholder } from "@/components/dashboard/module-placeholder";
+import { CompaniesCrud } from "@/components/companies/companies-crud";
+import { listCategoriesForFilter, listCompanies } from "./actions";
 
-export default function CompaniesPage() {
+export default async function CompaniesPage() {
+  const [initialList, initialCategories] = await Promise.all([
+    listCompanies({
+      search: "",
+      categoryId: "",
+      sortBy: "company_name",
+      sortDir: "asc",
+      page: 1,
+      pageSize: 10,
+    }),
+    listCategoriesForFilter(),
+  ]);
+
   return (
-    <ModulePlaceholder
-      title="Empresas"
-      description="Base CRUD para empresas ofertantes y sus datos comerciales."
-      ownerHint="Responsable: Persona 3"
+    <CompaniesCrud
+      initialList={initialList}
+      initialCategories={initialCategories}
     />
   );
 }
